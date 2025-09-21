@@ -25,7 +25,9 @@ export class KeycloakService {
         console.log('Keycloak initialized, authenticated:', authenticated);
         if (authenticated && this.keycloak?.tokenParsed) {
           console.log('User roles:', this.getUserRoles());
-          console.log('Token parsed:', this.keycloak.tokenParsed);
+          console.log('Dekodovan JWT  parsed:', this.keycloak.tokenParsed);
+          console.log('Refresh parsed:', this.keycloak.refreshToken);
+          console.log('Access parsed:', this.keycloak.token);
         }
         resolve(authenticated);
       })
@@ -51,10 +53,6 @@ export class KeycloakService {
 
   getToken(): string | undefined {
     return this.keycloak?.token;
-  }
-
-  getUsername(): string | undefined {
-    return this.keycloak?.tokenParsed?.['preferred_username'];
   }
 
   hasRealmRole(role: string): boolean {
@@ -90,7 +88,6 @@ export class KeycloakService {
   }
 
   isAdmin(): boolean {
-    // Proveri različite načine kako admin role mogu biti definisane
     const realmAdmin = this.hasRealmRole('admin');
     const realmAdminRole = this.hasRealmRole('realm-admin');
     const clientAdmin = this.hasClientRole('realm-management', 'realm-admin');
@@ -114,12 +111,10 @@ export class KeycloakService {
     const token = this.keycloak?.tokenParsed;
     let allRoles: string[] = [];
     
-    // Realm roles
     if (token && token['realm_access'] && token['realm_access']['roles']) {
       allRoles = [...token['realm_access']['roles']];
     }
     
-    // Client roles
     if (token && token['resource_access']) {
       Object.keys(token['resource_access']).forEach(clientId => {
         const clientRoles = token['resource_access']?.[clientId]?.['roles'] ?? [];

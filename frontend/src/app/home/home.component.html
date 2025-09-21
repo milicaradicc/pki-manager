@@ -1,2 +1,7 @@
-<h1>Welcome, {{ username }}</h1>
-<button (click)="logout()">Logout</button>
+<div *ngIf="user">
+      <h1>Welcome, {{ user.firstname }} {{ user.lastname }}!</h1>
+      <button (click)="logout()">Logout</button>
+    </div>
+    <div *ngIf="!user">
+      Loading user...
+    </div>

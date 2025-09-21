@@ -5,17 +5,9 @@ import { KeycloakService } from '../services/keycloak/keycloak.service';
 
 @Component({
   selector: 'app-home',
-  standalone: true,           
+  standalone: true,
   imports: [CommonModule],
-  template: `
-    <div *ngIf="user">
-      <h1>Welcome, {{ user.firstname }} {{ user.lastname }}!</h1>
-      <button (click)="logout()">Logout</button>
-    </div>
-    <div *ngIf="!user">
-      Loading user...
-    </div>
-  `
+  templateUrl: './home.component.html'
 })
 export class HomeComponent implements OnInit {
   user: User | undefined;

@@ -14,7 +14,7 @@ keycloakService.init()
       providers: [
         provideRouter(routes),
         { provide: KeycloakService, useValue: keycloakService },
-        importProvidersFrom(HttpClientModule) // <-- OVDE je bitno
+        importProvidersFrom(HttpClientModule) 
       ],
     }).catch(err => console.error(err));
   })
