@@ -1,7 +1,6 @@
 import { NgModule, APP_INITIALIZER } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { KeycloakService } from './services/keycloak/keycloak.service';
-import { AppComponent } from './app.component';
 import { AppRoutingModule } from './app.routing.module';
 
 export function initializeKeycloak(keycloak: KeycloakService) {
@@ -9,7 +8,7 @@ export function initializeKeycloak(keycloak: KeycloakService) {
 }
 
 @NgModule({
-  declarations: [AppComponent],
+  declarations: [],
   imports: [BrowserModule, AppRoutingModule],
   providers: [
     {
@@ -19,6 +18,6 @@ export function initializeKeycloak(keycloak: KeycloakService) {
       deps: [KeycloakService],
     },
   ],
-  bootstrap: [AppComponent],
+  bootstrap: [],
 })
 export class AppModule {}

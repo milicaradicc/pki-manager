@@ -31,6 +31,7 @@ export class KeycloakService {
   }
 
   logout() {
+    console.log("Logout pozvan");
     this.keycloak?.logout({ redirectUri: 'http://localhost:4200' });
   }
 
