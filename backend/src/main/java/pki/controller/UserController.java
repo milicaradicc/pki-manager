@@ -17,14 +17,15 @@ public class UserController {
         this.userService = userService;
     }
 
+    @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
     @GetMapping("/profile")
     public ResponseEntity<User> getUserProfile() {
         User loggedUser = userService.getLoggedUser();
-        return new ResponseEntity<>(loggedUser, HttpStatus.OK);
+        return ResponseEntity.ok(loggedUser);
     }
 
     @GetMapping("/")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> getAllUsers() {
         return new ResponseEntity<>("Hello world for admin", HttpStatus.OK);
     }
