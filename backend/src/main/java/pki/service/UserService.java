@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 import pki.model.User;
 import pki.repository.UserRepository;
 
+import java.util.Optional;
+
 @Service
 public class UserService {
 
@@ -15,16 +17,24 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public User getLoggedUser() {
-        JwtAuthenticationToken token = (JwtAuthenticationToken) SecurityContextHolder.getContext().getAuthentication();
-        return this.findUserByEmail(token.getTokenAttributes().get("email").toString());
-    }
-
     public User findUserByEmail(String email) {
-        return userRepository.findByEmail(email);
+        return userRepository.findByEmail(email).orElse(null);
     }
 
-    public User save(User data) {
-        return this.userRepository.save(data);
+    public User getLoggedUser() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken token) {
+            String email = String.valueOf(token.getTokenAttributes().get("email"));
+            return findUserByEmail(email);
+        }
+        return null;
+    }
+
+    public User save(User user) {
+        Optional<User> existing = userRepository.findByEmail(user.getEmail());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        return userRepository.save(user);
     }
 }

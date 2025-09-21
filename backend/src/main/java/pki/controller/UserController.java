@@ -3,11 +3,7 @@ package pki.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import pki.model.User;
 import pki.service.UserService;
 
@@ -21,28 +17,15 @@ public class UserController {
         this.userService = userService;
     }
 
-    // open access API
-    @GetMapping("/home")
-    public ResponseEntity<String> getHelloMessage() {
-        return new ResponseEntity<>("Hello world", HttpStatus.OK);
-    }
-
-    // authenticated API
     @GetMapping("/profile")
     public ResponseEntity<User> getUserProfile() {
-        User loggedUser = this.userService.getLoggedUser();
+        User loggedUser = userService.getLoggedUser();
         return new ResponseEntity<>(loggedUser, HttpStatus.OK);
     }
-    @PostMapping("/register")
-    public ResponseEntity<User> onUserRegister(@RequestBody User newUser) {
-        User savedUser = userService.save(newUser);
-        return new ResponseEntity<>(savedUser, HttpStatus.CREATED);
-    }
-    // API only for admin
+
     @GetMapping("/")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<String> getAllUsers() {
         return new ResponseEntity<>("Hello world for admin", HttpStatus.OK);
     }
-
 }

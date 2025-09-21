@@ -1,0 +1,57 @@
+# ========================
+# Spring Boot / Java
+# ========================
+# Maven / Gradle build
+target/
+build/
+
+# IDE fajlovi
+*.iml
+.idea/
+.vscode/
+*.ipr
+*.iws
+*.classpath
+*.project
+*.settings/
+
+# Log fajlovi
+*.log
+
+# OS fajlovi
+.DS_Store
+Thumbs.db
+
+# Spring Boot specific
+spring.log
+*.war
+*.jar
+
+# Secrets / env
+.env
+*.keystore
+*.jks
+
+# Generated files
+/generated/
+
+# ========================
+# Angular / Node.js
+# ========================
+# Node modules
+node_modules/
+# Angular build output
+dist/
+out-tsc/
+# Temporary files
+*.tmp
+*.temp
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# Environment files
+.env
+# IDE files
+.idea/
+.vscode/

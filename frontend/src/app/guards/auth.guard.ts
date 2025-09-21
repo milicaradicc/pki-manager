@@ -1,17 +1,62 @@
 import { Injectable } from '@angular/core';
-import { CanActivate, Router } from '@angular/router';
+import { CanActivate, Router, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import { KeycloakService } from '../services/keycloak/keycloak.service';
 
-@Injectable({ providedIn: 'root' })
+@Injectable({
+  providedIn: 'root'
+})
 export class AuthGuard implements CanActivate {
-  constructor(private keycloakService: KeycloakService, private router: Router) {}
 
-  async canActivate(): Promise<boolean> {
-    const isLoggedIn = await this.keycloakService.isLoggedIn();
-    if (!isLoggedIn) {
-      await this.keycloakService.login();  
-      return false; 
+  constructor(
+    private keycloakService: KeycloakService,
+    private router: Router
+  ) {
+    console.log('AuthGuard');
+  }
+
+  canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): boolean {
+    console.log('AuthGuard - canActivate called for route:', state.url);
+    
+    // Prvo proveri da li je korisnik ulogovan
+    if (!this.keycloakService.isLoggedIn()) {
+      console.log('User not logged in, redirecting to login');
+      this.keycloakService.login();
+      return false;
     }
-    return true;
+
+    console.log('User is logged in, checking admin privileges...');
+    
+    // Detaljnije logovanje svih dostupnih rola
+    const userRoles = this.keycloakService.getUserRoles();
+    console.log('All user roles:', userRoles);
+    
+    // Proveri različite varijante admin rola
+    const hasRealmAdmin = this.keycloakService.hasRealmRole('admin');
+    const hasRealmAdminRole = this.keycloakService.hasRealmRole('realm-admin');
+    const hasClientRealmAdmin = this.keycloakService.hasClientRole('realm-management', 'realm-admin');
+    const hasCustomAdmin = this.keycloakService.hasRealmRole('administrator');
+    const isAdmin = this.keycloakService.isAdmin();
+
+    console.log('Admin privilege checks:', {
+      hasRealmAdmin,
+      hasRealmAdminRole,
+      hasClientRealmAdmin,
+      hasCustomAdmin,
+      isAdmin
+    });
+
+    // Ako ima bilo koju admin rolu, dozvoli pristup
+    if (hasRealmAdmin || hasRealmAdminRole || hasClientRealmAdmin || hasCustomAdmin) {
+      console.log('Admin access granted');
+      return true;
+    }
+
+    // Nema admin privilegije
+    console.log('User does not have admin privileges');
+    console.log('Available roles:', userRoles);
+    
+    alert(`Nemate administratorske privilegije!\nVaše role: ${userRoles.join(', ')}`);
+    this.router.navigate(['/dashboard']);
+    return false;
   }
 }
