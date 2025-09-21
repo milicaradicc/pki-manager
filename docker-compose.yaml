@@ -3,13 +3,18 @@ services:
     image: 'postgres:latest'
     container_name: pki-postgres
     environment:
-      - POSTGRES_DB=pki
+      - POSTGRES_DB=pki  # Keep original database name
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
     ports:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d pki"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   pgadmin:
     image: 'dpage/pgadmin4:latest'
@@ -28,17 +33,20 @@ services:
     command: start-dev
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/pki
+      KC_DB_URL: jdbc:postgresql://postgres:5432/pki  # Match the database name
       KC_DB_USERNAME: user
       KC_DB_PASSWORD: password
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_HOSTNAME_STRICT: false
       KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT_HTTPS: false  # Added for dev mode
+      KC_LOG_LEVEL: INFO  # Added for better logging
     ports:
       - '8080:8080'
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy  # Wait for postgres to be ready
 
 volumes:
   postgres_data:

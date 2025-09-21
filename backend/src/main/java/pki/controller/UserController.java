@@ -4,6 +4,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pki.model.User;
@@ -31,7 +33,11 @@ public class UserController {
         User loggedUser = this.userService.getLoggedUser();
         return new ResponseEntity<>(loggedUser, HttpStatus.OK);
     }
-
+    @PostMapping("/register")
+    public ResponseEntity<User> onUserRegister(@RequestBody User newUser) {
+        User savedUser = userService.save(newUser);
+        return new ResponseEntity<>(savedUser, HttpStatus.CREATED);
+    }
     // API only for admin
     @GetMapping("/")
     @PreAuthorize("hasRole('ROLE_ADMIN')")

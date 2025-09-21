@@ -10,8 +10,8 @@ import lombok.Setter;
 @Table(name = "USER_")
 @Setter
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 public class User {
 
     @Id
@@ -30,6 +30,6 @@ public class User {
     @Column
     private String lastname;
 
-
-
+    @Column
+    private String organization;
 }
