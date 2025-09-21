@@ -6,7 +6,7 @@ describe('KeycloakService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
-    service = TestBed.inject(KeycloakService);  // << koristi svoj servis
+    service = TestBed.inject(KeycloakService); 
   });
 
   it('should be created', () => {
