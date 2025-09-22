@@ -1,10 +1,10 @@
 import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { AdminNavBarComponent } from './layout/admin-nav-bar/admin-nav-bar.component';
-import { CaNavBarComponent } from './layout/ca-nav-bar/ca-nav-bar.component';
-import { KeycloakService } from './services/keycloak/keycloak.service';
-import { UserNavBarComponent } from './layout/user-nav-bar/user-nav-bar.component';
+import { AdminNavBarComponent } from './features/users/layout/admin-nav-bar/admin-nav-bar.component';
+import { CaNavBarComponent } from './features/users/layout/ca-nav-bar/ca-nav-bar.component';
+import { KeycloakService } from './core/keycloak/keycloak.service';
+import { UserNavBarComponent } from './features/users/layout/user-nav-bar/user-nav-bar.component';
 
 @Component({
   selector: 'app-root',

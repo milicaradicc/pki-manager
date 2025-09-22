@@ -1,16 +1,17 @@
 import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { KeycloakService } from '../../services/keycloak/keycloak.service';
+import { KeycloakService } from '../../../../core/keycloak/keycloak.service';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-admin-nav-bar',
   standalone: true,
-  imports: [RouterModule],
+  imports: [RouterModule, CommonModule],
   templateUrl: './admin-nav-bar.component.html',
   styleUrls: ['./admin-nav-bar.component.css']
 })
 export class AdminNavBarComponent {
-  constructor(private keycloakService: KeycloakService) {}
+  constructor(public keycloakService: KeycloakService) {}
 
   logout() {
     this.keycloakService.logout();

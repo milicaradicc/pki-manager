@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { CanActivate, Router, ActivatedRouteSnapshot } from '@angular/router';
-import { KeycloakService } from '../services/keycloak/keycloak.service';
+import { KeycloakService } from './keycloak/keycloak.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthGuard implements CanActivate {
@@ -16,19 +16,15 @@ export class AuthGuard implements CanActivate {
     const allowedRoles: string[] = route.data['roles'] || [];
     const userRoles = this.keycloakService.getUserRoles();
 
-    console.log('User roles:', userRoles);
+    console.log('User roles (filtered):', userRoles);
 
-    const appRoles = userRoles.filter(
-      r => !r.includes(':') && r !== 'offline_access' && r !== 'uma_authorization'
+    const hasAccess = allowedRoles.some(role =>
+      userRoles.some(userRole => userRole.toLowerCase() === role.toLowerCase())
     );
 
-    const hasRole = allowedRoles.some(role =>
-      appRoles.some(userRole => userRole.toLowerCase() === role.toLowerCase())
-    );
-
-    if (!hasRole) {
+    if (!hasAccess) {
       alert('Nemate pristup ovoj stranici!');
-      this.router.navigate(['/']); 
+      this.router.navigate(['/']);
       return false;
     }
 

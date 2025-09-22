@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { KeycloakService } from '../../services/keycloak/keycloak.service';
+import { KeycloakService } from '../../../../core/keycloak/keycloak.service';
 
 @Component({
   selector: 'app-user-nav-bar',

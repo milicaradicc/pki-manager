@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { KeycloakService } from '../../services/keycloak/keycloak.service';
+import { KeycloakService } from '../../../../core/keycloak/keycloak.service';
 
 @Component({
   selector: 'app-ca-nav-bar',

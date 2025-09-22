@@ -1,7 +1,9 @@
 import { NgModule, APP_INITIALIZER } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
-import { KeycloakService } from './services/keycloak/keycloak.service';
+import { HTTP_INTERCEPTORS } from '@angular/common/http';
+import { KeycloakService } from './core/keycloak/keycloak.service';
 import { AppRoutingModule } from './app.routing.module';
+import { Interceptor } from './core/interceptor';
 
 export function initializeKeycloak(keycloak: KeycloakService) {
   return () => keycloak.init();
@@ -17,6 +19,11 @@ export function initializeKeycloak(keycloak: KeycloakService) {
       multi: true,
       deps: [KeycloakService],
     },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: Interceptor,
+      multi: true
+    }
   ],
   bootstrap: [],
 })

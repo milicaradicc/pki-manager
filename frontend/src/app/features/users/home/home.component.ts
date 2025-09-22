@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { UserService, User } from '../services/user/user.service';
-import { KeycloakService } from '../services/keycloak/keycloak.service';
+import { UserService, User } from '../user.service';
+import { KeycloakService } from '../../../core/keycloak/keycloak.service';
 
 @Component({
   selector: 'app-home',

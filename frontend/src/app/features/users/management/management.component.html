@@ -1,0 +1,168 @@
+<div class="management-container">
+  <div class="header">
+    <h1>{{ title }}</h1>
+    <div class="header-actions">
+    </div>
+  </div>
+
+  <div *ngIf="error" class="alert alert-error">
+    <span>{{ error }}</span>
+    <button class="close-btn" (click)="clearMessages()">&times;</button>
+  </div>
+
+  <div *ngIf="success" class="alert alert-success">
+    <span>{{ success }}</span>
+    <button class="close-btn" (click)="clearMessages()">&times;</button>
+  </div>
+
+  <div *ngIf="loading" class="loading">
+    <div class="spinner"></div>
+    <span>Loading...</span>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h2>User Management</h2>
+      <button 
+        class="btn btn-primary" 
+        (click)="toggleCreateForm()"
+        [disabled]="loading">
+        {{ showCreateForm ? 'Cancel' : 'Create User' }}
+      </button>
+    </div>
+
+    <div *ngIf="showCreateForm" class="create-form">
+      <h3>Create New User</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="username">Username *</label>
+          <input 
+            type="text" 
+            id="username"
+            [(ngModel)]="newUser.username" 
+            placeholder="Enter username"
+            required>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input 
+            type="email" 
+            id="email"
+            [(ngModel)]="newUser.email" 
+            placeholder="Enter email">
+        </div>
+
+        <div class="form-group">
+          <label for="firstName">First Name</label>
+          <input 
+            type="text" 
+            id="firstName"
+            [(ngModel)]="newUser.firstName" 
+            placeholder="Enter first name">
+        </div>
+
+        <div class="form-group">
+          <label for="lastName">Last Name</label>
+          <input 
+            type="text" 
+            id="lastName"
+            [(ngModel)]="newUser.lastName" 
+            placeholder="Enter last name">
+        </div>
+
+        <div class="form-group">
+          <label for="organization">Organization</label>
+          <input 
+            type="text" 
+            id="organization"
+            [(ngModel)]="newUserOrganization" 
+            placeholder="Enter organization">
+        </div>
+
+        <div class="form-group">
+          <label for="role">Role</label>
+          <select id="role" [(ngModel)]="selectedRole">
+            <option value="">Select role</option>
+            <option *ngFor="let role of roles" [value]="role.name">
+              {{ role.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button 
+          class="btn btn-primary" 
+          (click)="createUser()"
+          [disabled]="loading || !newUser.username">
+          Create User
+        </button>
+        <button 
+          class="btn btn-secondary" 
+          (click)="toggleCreateForm()"
+          [disabled]="loading">
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <div class="users-table-container">
+      <div class="table-header">
+        <h3>User List ({{ users.length }})</h3>
+        <button 
+          class="btn btn-secondary" 
+          (click)="loadUsers()"
+          [disabled]="loading">
+          Refresh
+        </button>
+      </div>
+
+      <div *ngIf="users.length === 0 && !loading" class="no-users">
+        No users found.
+      </div>
+
+      <table *ngIf="users.length > 0" class="users-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Email</th>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of users" class="user-row">
+            <td class="username">{{ user.username }}</td>
+            <td>{{ user.email || '-' }}</td>
+            <td>{{ user.firstName || '-' }}</td>
+            <td>{{ user.lastName || '-' }}</td>
+            <td>
+              <span 
+                class="status-badge" 
+                [ngClass]="user.enabled ? 'status-active' : 'status-inactive'">
+                {{ user.enabled ? 'Active' : 'Inactive' }}
+              </span>
+            </td>
+            <td>
+              {{ user.createdTimestamp ? 
+                 (user.createdTimestamp | date:'dd.MM.yyyy HH:mm') : '-' }}
+            </td>
+            <td class="actions">
+              <button 
+                class="btn btn-danger btn-sm" 
+                (click)="deleteUser(user.id!, user.username)"
+                [disabled]="loading"
+                title="Delete User">
+                Delete
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
