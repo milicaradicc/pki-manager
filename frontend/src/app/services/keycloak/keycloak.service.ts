@@ -51,7 +51,7 @@ export class KeycloakService {
 
       this.keycloak.init({
         onLoad: 'login-required',
-        checkLoginIframe: false,
+        checkLoginIframe: true,
         pkceMethod: 'S256',
       })
       .then(authenticated => {
