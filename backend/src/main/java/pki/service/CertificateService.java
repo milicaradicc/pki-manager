@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pki.dto.CreateCertificatePartyDTO;
 import org.modelmapper.ModelMapper;
+import pki.dto.CreateIntermediateCertificateDTO;
 import pki.dto.CreateRootCertificateDTO;
 import pki.model.Certificate;
 import pki.model.CertificateParty;
@@ -68,6 +69,32 @@ public class CertificateService {
 
         Certificate certificate = new Certificate(serialNumber, subject, subject, CertificateType.ROOT);
         certificateRepository.save(certificate);
+    }
+
+    public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, CertIOException {
+        //TODO if ca is logged in check if it has permission for issuer cert
+        //TODO check cert chain validity
+
+        CertificateParty subject = modelMapper.map(certificateDTO.getSubject(), CertificateParty.class);
+        subject.setId(java.util.UUID.randomUUID().toString());
+        KeyPair keyPair = generateKeyPair();
+        subject.setPrivateKey(keyPair.getPrivate());
+        subject.setPublicKey(keyPair.getPublic());
+        subject = certificatePartyRepository.save(subject);
+
+        CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId()).orElse(null);
+
+        String serialNumber = UUID.randomUUID().toString().replace("-","");
+        X509Certificate x509certificate = generateCertificate(subject, issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate(), serialNumber, true);
+
+        keyStoreWriter.loadKeyStore(keyStoreFilePath,  keyStorePassword.toCharArray());
+        keyStoreWriter.write(serialNumber, subject.getPrivateKey(), keyStorePassword.toCharArray() , x509certificate);
+        keyStoreWriter.saveKeyStore(keyStoreFilePath,  keyStorePassword.toCharArray());
+
+        Certificate certificate = new Certificate(serialNumber, subject, issuer, CertificateType.INTERMEDIATE);
+        certificateRepository.save(certificate);
+
+        //TODO if ca user add to owned certificates
     }
 
     private KeyPair generateKeyPair() throws NoSuchAlgorithmException, NoSuchProviderException {
