@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pki.dto.CreateCertificatePartyDTO;
 import org.modelmapper.ModelMapper;
+import pki.dto.CreateEndEntityCertificateDTO;
 import pki.dto.CreateIntermediateCertificateDTO;
 import pki.dto.CreateRootCertificateDTO;
 import pki.model.Certificate;
@@ -95,6 +96,35 @@ public class CertificateService {
         certificateRepository.save(certificate);
 
         //TODO if ca user add to owned certificates
+    }
+
+    public void issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, CertIOException {
+        //TODO if ca is logged in check if it has permission for issuer cert
+        //TODO check cert chain validity
+
+        CertificateParty subject = modelMapper.map(certificateDTO.getSubject(), CertificateParty.class);
+        subject.setId(java.util.UUID.randomUUID().toString());
+        KeyPair keyPair = generateKeyPair();
+        subject.setPrivateKey(keyPair.getPrivate());
+        subject.setPublicKey(keyPair.getPublic());
+        subject = certificatePartyRepository.save(subject);
+
+        CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId()).orElse(null);
+
+        String serialNumber = UUID.randomUUID().toString().replace("-","");
+        X509Certificate x509certificate = generateCertificate(subject, issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate(), serialNumber, false);
+
+        keyStoreWriter.loadKeyStore(keyStoreFilePath,  keyStorePassword.toCharArray());
+        keyStoreWriter.write(serialNumber, subject.getPrivateKey(), keyStorePassword.toCharArray() , x509certificate);
+        keyStoreWriter.saveKeyStore(keyStoreFilePath,  keyStorePassword.toCharArray());
+
+        Certificate certificate = new Certificate(serialNumber, subject, issuer, CertificateType.END_ENTITY);
+        certificateRepository.save(certificate);
+
+        keyStoreReader.downloadCertificate(x509certificate);
+
+        //TODO if ca user add to owned certificates
+        //TODO if ordinary user add to owned certificates
     }
 
     private KeyPair generateKeyPair() throws NoSuchAlgorithmException, NoSuchProviderException {

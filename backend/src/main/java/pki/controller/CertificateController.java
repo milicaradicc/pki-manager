@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import pki.dto.CreateCertificatePartyDTO;
+import pki.dto.CreateEndEntityCertificateDTO;
 import pki.dto.CreateIntermediateCertificateDTO;
 import pki.dto.CreateRootCertificateDTO;
 import pki.model.User;
@@ -36,6 +37,13 @@ public class CertificateController {
     @PostMapping("/intermediate")
     public ResponseEntity<Void> issueIntermediateCertificate(@RequestBody CreateIntermediateCertificateDTO certificateDTO) throws ParseException, CertificateException, NoSuchAlgorithmException, NoSuchProviderException, OperatorCreationException, CertIOException {
         certificateService.issueIntermediateCertificate(certificateDTO);
+        return ResponseEntity.ok( null );
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
+    @PostMapping("/end-entity")
+    public ResponseEntity<Void> issueEndEntityCertificate(@RequestBody CreateEndEntityCertificateDTO certificateDTO) throws ParseException, CertificateException, NoSuchAlgorithmException, NoSuchProviderException, OperatorCreationException, CertIOException {
+        certificateService.issueEndEntityCertificate(certificateDTO);
         return ResponseEntity.ok( null );
     }
 }
