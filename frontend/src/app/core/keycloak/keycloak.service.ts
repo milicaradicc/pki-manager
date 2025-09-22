@@ -11,7 +11,7 @@ import { switchMap } from 'rxjs/operators';
 })
 export class KeycloakService {
   private keycloak: Keycloak | undefined;
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = 'https://localhost:9443';
   private readonly realm = 'pki';
 
   constructor(private http: HttpClient) { }
@@ -35,7 +35,7 @@ export class KeycloakService {
   }
 
   login() { this.keycloak?.login(); }
-  logout() { this.keycloak?.logout({ redirectUri: 'http://localhost:4200' }); }
+  logout() { this.keycloak?.logout({ redirectUri: 'https://localhost:4200' }); }
   isLoggedIn(): boolean { return this.keycloak?.authenticated ?? false; }
   getToken(): string | undefined { return this.keycloak?.token; }
 
