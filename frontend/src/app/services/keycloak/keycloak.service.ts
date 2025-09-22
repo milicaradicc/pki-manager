@@ -101,7 +101,6 @@ export class KeycloakService {
   }
 
   hasRealmManagementRole(): boolean {
-    // Proveri da li ima realm-management client roles
     return this.hasClientRole('realm-management', 'realm-admin') ||
            this.hasClientRole('realm-management', 'manage-users') ||
            this.hasClientRole('realm-management', 'view-users');

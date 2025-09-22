@@ -40,7 +40,7 @@ export class ManagementComponent implements OnInit {
       this.loadUsers();
       this.loadRoles();
     } else {
-      this.error = 'Nemate dozvolu za pristup admin panelu.';
+      this.error = 'Cannot access admin panel.';
     }
   }
 
@@ -54,9 +54,8 @@ export class ManagementComponent implements OnInit {
         this.loading = false;
       },
       error: (err) => {
-        this.error = 'Greška pri učitavanju korisnika: ' + err.message;
+        this.error = 'Error: ' + err.message;
         this.loading = false;
-        console.error('Error loading users:', err);
       }
     });
   }
@@ -64,8 +63,6 @@ export class ManagementComponent implements OnInit {
   loadRoles() {
     this.keycloakService.getAllRoles().subscribe({
       next: (roles) => {
-        console.log('Loaded roles from API:', roles);
-        // filter roles
         this.roles = roles.filter(role => 
           ['admin', 'ca', 'user'].includes(role.name)
         );
@@ -99,12 +96,12 @@ export class ManagementComponent implements OnInit {
 
 createUser() {
   if (!this.newUser.username.trim()) {
-    this.error = 'Korisničko ime je obavezno';
+    this.error = 'User name required';
     return;
   }
 
   if (!this.newUserPassword.trim()) {
-    this.error = 'Lozinka je obavezna';
+    this.error = 'Password required';
     return;
   }
 
@@ -133,7 +130,6 @@ createUser() {
             const userId = locationHeader.split('/').pop();
             if (userId) {
 
-                // 1️⃣ Pošalji email za verifikaciju
                 this.keycloakService.sendVerificationEmail(userId).subscribe({
                 next: () => {
                     console.log('Verification email sent');
@@ -143,18 +139,17 @@ createUser() {
                 }
                 });
 
-                // 2️⃣ Dodeli ulogu ako je izabrana
                 if (this.selectedRole) {
                 this.keycloakService.assignRoleToUser(userId, this.selectedRole).subscribe({
                     next: () => {
-                    this.success = 'Korisnik je uspešno kreiran sa ulogom ' + this.selectedRole;
+                    this.success = 'User created with role ' + this.selectedRole;
                     this.loadUsers();
                     this.resetCreateForm();
                     this.showCreateForm = false;
                     this.loading = false;
                     },
                     error: (err) => {
-                    this.error = 'Korisnik je kreiran, ali uloga nije dodeljena: ' + err.message;
+                    this.error = 'User created, role error: ' + err.message;
                     this.loadUsers();
                     this.loading = false;
                     }
@@ -164,31 +159,29 @@ createUser() {
             }
             }
 
-            this.success = 'Korisnik je uspešno kreiran';
+            this.success = 'User created';
             this.loadUsers();
             this.resetCreateForm();
             this.showCreateForm = false;
             this.loading = false;
         },
         error: (err) => {
-            console.error('Full error object:', err);
-            this.error = 'Greška pri kreiranju korisnika: ' + (err.error?.errorMessage || err.message);
+            this.error = 'Error creating user: ' + (err.error?.errorMessage || err.message);
             this.loading = false;
         }
     });
   }
 
   deleteUser(userId: string, username: string) {
-    if (confirm(`Da li ste sigurni da želite da obrišete korisnika "${username}"?`)) {
+    if (confirm(`Are you sure you want to delete user "${username}"?`)) {
       this.loading = true;
       
       this.keycloakService.deleteUser(userId).subscribe({
         next: () => {
-          this.success = `Korisnik "${username}" je uspešno obrisan`;
+          this.success = `User "${username}" deleted`;
           this.loadUsers();
         },
         error: (err) => {
-          this.error = 'Greška pri brisanju korisnika: ' + err.message;
           this.loading = false;
           console.error('Error deleting user:', err);
         }
