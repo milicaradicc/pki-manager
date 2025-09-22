@@ -26,10 +26,8 @@ export class ManagementComponent implements OnInit {
     lastName: '',
     enabled: true,
     attributes: {}, 
-    credentials: [],
     emailVerified: false
   };
-  newUserPassword = '';
   selectedRole = '';
   newUserOrganization = '';
 
@@ -85,9 +83,7 @@ export class ManagementComponent implements OnInit {
       lastName: '',
       enabled: true,
       attributes: {},
-      credentials: []
     };
-    this.newUserPassword = '';
     this.newUserOrganization = ''; 
     this.selectedRole = '';
     this.error = null;
@@ -99,12 +95,6 @@ createUser() {
     this.error = 'User name required';
     return;
   }
-
-  if (!this.newUserPassword.trim()) {
-    this.error = 'Password required';
-    return;
-  }
-
   this.loading = true;
   this.error = null;
 
@@ -115,11 +105,6 @@ createUser() {
           organization: [this.newUserOrganization.trim()] 
         })
       },
-      credentials: [{
-        type: 'password',
-        value: this.newUserPassword,
-        temporary: true
-      }],
       emailVerified: false
     };
 

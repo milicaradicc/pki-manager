@@ -72,16 +72,6 @@
         </div>
 
         <div class="form-group">
-          <label for="password">Temporary Password *</label>
-          <input 
-            type="password" 
-            id="password"
-            [(ngModel)]="newUserPassword" 
-            placeholder="Enter temporary password"
-            required>
-        </div>
-
-        <div class="form-group">
           <label for="organization">Organization</label>
           <input 
             type="text" 
@@ -105,7 +95,7 @@
         <button 
           class="btn btn-primary" 
           (click)="createUser()"
-          [disabled]="loading || !newUser.username || !newUserPassword">
+          [disabled]="loading || !newUser.username">
           Create User
         </button>
         <button 

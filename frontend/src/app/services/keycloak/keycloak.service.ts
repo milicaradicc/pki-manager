@@ -24,11 +24,6 @@ export interface CreateUserRequest {
   enabled: boolean;
   emailVerified?: boolean;
   attributes?: { [key: string]: string[] }; 
-  credentials?: Array<{
-    type: string;
-    value: string;
-    temporary: boolean;
-  }>;
 }
 
 @Injectable({
@@ -259,7 +254,7 @@ export class KeycloakService {
       switchMap(headers => 
         this.http.put(
           `${this.baseUrl}/admin/realms/${this.realm}/users/${userId}/execute-actions-email`,
-          ['VERIFY_EMAIL'], 
+          ['VERIFY_EMAIL', 'UPDATE_PASSWORD'], 
           { headers }
         )
       )
