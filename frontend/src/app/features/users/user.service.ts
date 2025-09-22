@@ -23,12 +23,5 @@ export class UserService {
   getUserProfile(): Observable<User> {
     return this.http.get<User>(`${this.baseUrl}/profile`);
   }
-
-  getUserRole(): Observable<any> {
-    if (this.keycloak.isAdmin()) return of('admin');
-    if (this.keycloak.isCA()) return of('ca');
-    if (this.keycloak.isUser()) return of('user');
-    return of(null); 
-  }
 }
 
