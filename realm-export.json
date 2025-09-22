@@ -444,7 +444,7 @@
   "requiredCredentials": [
     "password"
   ],
-  "passwordPolicy": "hashIterations(27500) and length(8) and notEmail(undefined) and notUsername(undefined) and specialChars(1) and upperCase(1) and lowerCase(1) and maxLength(64) and digits(1) and passwordHistory(3) and passwordAge(30)",
+  "passwordPolicy": "hashIterations(27500) and length(8) and notEmail(undefined) and notUsername(undefined) and specialChars(1) and upperCase(1) and lowerCase(1) and maxLength(64) and digits(1)",
   "otpPolicyType": "totp",
   "otpPolicyAlgorithm": "HmacSHA1",
   "otpPolicyInitialCounter": 0,
@@ -712,7 +712,7 @@
         "http://localhost:4200/*"
       ],
       "webOrigins": [
-        "*"
+        "http://localhost:4200"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -2573,7 +2573,7 @@
     "clientSessionMaxLifespan": "0",
     "organizationsEnabled": "false"
   },
-  "keycloakVersion": "26.0.2",
+  "keycloakVersion": "26.0.0",
   "userManagedAccessAllowed": false,
   "organizationsEnabled": false,
   "clientProfiles": {

@@ -11,14 +11,11 @@ export class AuthGuard implements CanActivate {
     private keycloakService: KeycloakService,
     private router: Router
   ) {
-    console.log("omggggggggggg")
   }
 
   canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): boolean {
-    console.log('AuthGuard - canActivate called for route:', state.url);
 
     if (!this.keycloakService.isLoggedIn()) {
-      console.log('User not logged in, redirecting to login');
       this.keycloakService.login();
       return false;
     }

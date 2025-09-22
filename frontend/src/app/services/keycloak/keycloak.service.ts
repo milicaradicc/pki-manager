@@ -16,10 +16,11 @@ export class KeycloakService {
         realm: 'pki',
         clientId: 'frontend'
       });
-
+  
       this.keycloak.init({
         onLoad: 'login-required',
-        checkLoginIframe: false
+        checkLoginIframe: false,
+        pkceMethod: 'S256',
       })
       .then(authenticated => {
         console.log('Keycloak initialized, authenticated:', authenticated);
