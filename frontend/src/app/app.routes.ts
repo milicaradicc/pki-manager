@@ -3,17 +3,24 @@ import { RouterModule, Routes } from '@angular/router';
 import { HomeComponent } from './features/users/home/home.component';
 import { ManagementComponent } from './features/users/management/management.component';
 import { AuthGuard } from './core/auth.guard';
+import {CreateRootComponent} from './features/certificates/create-root/create-root.component';
 
 export const routes: Routes = [
-  { 
-    path: '', 
-    component: HomeComponent, 
+  {
+    path: '',
+    component: HomeComponent,
     canActivate: [AuthGuard] ,
     data: { roles: ['admin', 'user', 'ca'] }
   },
   {
     path: 'management',
     component: ManagementComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['admin'] }
+  },
+  {
+    path: 'create-root',
+    component: CreateRootComponent,
     canActivate: [AuthGuard],
     data: { roles: ['admin'] }
   },
