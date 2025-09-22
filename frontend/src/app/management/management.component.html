@@ -1,4 +1,183 @@
 <div class="management-container">
-  <h2>{{ title }}</h2>
-  <p>ADMIN PANEL</p>
+  <div class="header">
+    <h1>{{ title }}</h1>
+    <div class="header-actions">
+    </div>
+  </div>
+
+  <!-- Poruke o grešci i uspešnosti -->
+  <div *ngIf="error" class="alert alert-error">
+    <span>{{ error }}</span>
+    <button class="close-btn" (click)="clearMessages()">&times;</button>
+  </div>
+
+  <div *ngIf="success" class="alert alert-success">
+    <span>{{ success }}</span>
+    <button class="close-btn" (click)="clearMessages()">&times;</button>
+  </div>
+
+  <!-- Loading indikator -->
+  <div *ngIf="loading" class="loading">
+    <div class="spinner"></div>
+    <span>Učitavam...</span>
+  </div>
+
+  <!-- Upravljanje korisnicima -->
+  <div class="section">
+    <div class="section-header">
+      <h2>Upravljanje korisnicima</h2>
+      <button 
+        class="btn btn-primary" 
+        (click)="toggleCreateForm()"
+        [disabled]="loading">
+        {{ showCreateForm ? 'Otkaži' : 'Kreiraj korisnika' }}
+      </button>
+    </div>
+
+    <!-- Forma za kreiranje korisnika -->
+    <div *ngIf="showCreateForm" class="create-form">
+      <h3>Kreiraj novog korisnika</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="username">Korisničko ime *</label>
+          <input 
+            type="text" 
+            id="username"
+            [(ngModel)]="newUser.username" 
+            placeholder="Unesite korisničko ime"
+            required>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input 
+            type="email" 
+            id="email"
+            [(ngModel)]="newUser.email" 
+            placeholder="Unesite email">
+        </div>
+
+        <div class="form-group">
+          <label for="firstName">Ime</label>
+          <input 
+            type="text" 
+            id="firstName"
+            [(ngModel)]="newUser.firstName" 
+            placeholder="Unesite ime">
+        </div>
+
+        <div class="form-group">
+          <label for="lastName">Prezime</label>
+          <input 
+            type="text" 
+            id="lastName"
+            [(ngModel)]="newUser.lastName" 
+            placeholder="Unesite prezime">
+        </div>
+
+        <div class="form-group">
+          <label for="password">Privremena lozinka *</label>
+          <input 
+            type="password" 
+            id="password"
+            [(ngModel)]="newUserPassword" 
+            placeholder="Unesite privremenu lozinku"
+            required>
+        </div>
+
+        <div class="form-group">
+          <label for="organization">Organization</label>
+          <input 
+            type="text" 
+            id="organization"
+            [(ngModel)]="newUserOrganization" 
+            placeholder="Unesite organizaciju">
+        </div>
+
+        <div class="form-group">
+          <label for="role">Uloga</label>
+          <select id="role" [(ngModel)]="selectedRole">
+            <option value="">Izaberite ulogu</option>
+            <option *ngFor="let role of roles" [value]="role.name">
+              {{ role.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button 
+          class="btn btn-primary" 
+          (click)="createUser()"
+          [disabled]="loading || !newUser.username || !newUserPassword">
+          Kreiraj korisnika
+        </button>
+        <button 
+          class="btn btn-secondary" 
+          (click)="toggleCreateForm()"
+          [disabled]="loading">
+          Otkaži
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabela korisnika -->
+    <div class="users-table-container">
+      <div class="table-header">
+        <h3>Lista korisnika ({{ users.length }})</h3>
+        <button 
+          class="btn btn-secondary" 
+          (click)="loadUsers()"
+          [disabled]="loading">
+          Osveži
+        </button>
+      </div>
+
+      <div *ngIf="users.length === 0 && !loading" class="no-users">
+        Nema pronađenih korisnika.
+      </div>
+
+      <table *ngIf="users.length > 0" class="users-table">
+        <thead>
+          <tr>
+            <th>Korisničko ime</th>
+            <th>Email</th>
+            <th>Ime</th>
+            <th>Prezime</th>
+            <th>Status</th>
+            <th>Kreiran</th>
+            <th>Akcije</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let user of users" class="user-row">
+            <td class="username">{{ user.username }}</td>
+            <td>{{ user.email || '-' }}</td>
+            <td>{{ user.firstName || '-' }}</td>
+            <td>{{ user.lastName || '-' }}</td>
+            <td>
+              <span 
+                class="status-badge" 
+                [ngClass]="user.enabled ? 'status-active' : 'status-inactive'">
+                {{ user.enabled ? 'Aktivan' : 'Neaktivan' }}
+              </span>
+            </td>
+            <td>
+              {{ user.createdTimestamp ? 
+                 (user.createdTimestamp | date:'dd.MM.yyyy HH:mm') : '-' }}
+            </td>
+            <td class="actions">
+              <button 
+                class="btn btn-danger btn-sm" 
+                (click)="deleteUser(user.id!, user.username)"
+                [disabled]="loading"
+                title="Obriši korisnika">
+                Obriši
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
