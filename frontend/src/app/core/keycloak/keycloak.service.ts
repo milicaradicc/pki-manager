@@ -39,11 +39,6 @@ export class KeycloakService {
   isLoggedIn(): boolean { return this.keycloak?.authenticated ?? false; }
   getToken(): string | undefined { return this.keycloak?.token; }
 
-  async updateTokenIfNeeded(): Promise<void> {
-    if (!this.keycloak) return;
-    await this.keycloak.updateToken(30);
-  }
-
   getAllUsers(): Observable<KeycloakUser[]> {
     return this.http.get<KeycloakUser[]>(`${this.baseUrl}/admin/realms/${this.realm}/users`);
   }
@@ -76,14 +71,6 @@ export class KeycloakService {
 
   getAllRoles(): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/admin/realms/${this.realm}/roles`);
-  }
-
-  setTemporaryPassword(userId: string, password: string): Observable<any> {
-    return this.http.put(`${this.baseUrl}/admin/realms/${this.realm}/users/${userId}/reset-password`, {
-      type: 'password',
-      value: password,
-      temporary: true
-    });
   }
 
   sendVerificationEmail(userId: string): Observable<any> {
@@ -124,6 +111,7 @@ export class KeycloakService {
           this.hasClientRole('realm-management', 'manage-users') ||
           this.hasClientRole('realm-management', 'view-users');
   }
+
   getUserRoles(): string[] {
     const token = this.keycloak?.tokenParsed;
     if (!token) return [];
@@ -135,5 +123,4 @@ export class KeycloakService {
     if (!this.keycloak) return '';
       return `${this.baseUrl}/realms/${this.realm}/account`;
   }
-
 }
