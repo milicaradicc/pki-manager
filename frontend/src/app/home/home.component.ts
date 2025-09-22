@@ -24,8 +24,4 @@ export class HomeComponent implements OnInit {
       this.keycloakService.login();
     }
   }
-
-  logout() {
-    this.keycloakService.logout();
-  }
 }

@@ -5,10 +5,21 @@ import { ManagementComponent } from './management/management.component';
 import { AuthGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', component: ManagementComponent, canActivate: [AuthGuard] }, // admin main if needed
-  { path: '', component: HomeComponent },
+  { 
+    path: '', 
+    component: HomeComponent, 
+    canActivate: [AuthGuard] ,
+    data: { roles: ['admin', 'user', 'ca'] }
+  },
+  {
+    path: 'management',
+    component: ManagementComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['admin'] }
+  },
   { path: '**', redirectTo: '' }
 ];
+
 
 @NgModule({
   imports: [RouterModule.forRoot(routes)],

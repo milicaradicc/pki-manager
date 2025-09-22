@@ -3,7 +3,7 @@ services:
     image: 'postgres:latest'
     container_name: pki-postgres
     environment:
-      - POSTGRES_DB=pki  # Keep original database name
+      - POSTGRES_DB=pki 
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
     ports:
@@ -33,20 +33,20 @@ services:
     command: start-dev
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/pki  # Match the database name
+      KC_DB_URL: jdbc:postgresql://postgres:5432/pki 
       KC_DB_USERNAME: user
       KC_DB_PASSWORD: password
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_HOSTNAME_STRICT: false
       KC_HTTP_ENABLED: true
-      KC_HOSTNAME_STRICT_HTTPS: false  # Added for dev mode
-      KC_LOG_LEVEL: INFO  # Added for better logging
+      KC_HOSTNAME_STRICT_HTTPS: false  
+      KC_LOG_LEVEL: INFO  
     ports:
       - '8080:8080'
     depends_on:
       postgres:
-        condition: service_healthy  # Wait for postgres to be ready
+        condition: service_healthy  
 
 volumes:
   postgres_data:
