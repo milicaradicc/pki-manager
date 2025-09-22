@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Entity
 @Table(name = "USER_")
 @Setter
@@ -32,4 +34,7 @@ public class User {
 
     @Column
     private String organization;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    private List<Certificate> ownedCertificates;
 }
