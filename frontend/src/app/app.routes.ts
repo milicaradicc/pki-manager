@@ -4,6 +4,7 @@ import { HomeComponent } from './features/users/home/home.component';
 import { ManagementComponent } from './features/users/management/management.component';
 import { AuthGuard } from './core/auth.guard';
 import {CreateRootComponent} from './features/certificates/create-root/create-root.component';
+import {CreateIntermediateComponent} from './features/certificates/create-intermediate/create-intermediate.component';
 
 export const routes: Routes = [
   {
@@ -23,6 +24,12 @@ export const routes: Routes = [
     component: CreateRootComponent,
     canActivate: [AuthGuard],
     data: { roles: ['admin'] }
+  },
+  {
+    path: 'create-intermediate',
+    component: CreateIntermediateComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['admin','ca'] }
   },
   { path: '**', redirectTo: '' }
 ];
