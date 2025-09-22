@@ -13,6 +13,7 @@ import pki.model.User;
 import pki.service.UserService;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 @Component
 public class JwtUserFilter extends OncePerRequestFilter {
@@ -34,7 +35,7 @@ public class JwtUserFilter extends OncePerRequestFilter {
                 String firstname = String.valueOf(token.getTokenAttributes().get("given_name"));
                 String lastname = String.valueOf(token.getTokenAttributes().get("family_name"));
                 String organization = String.valueOf(token.getTokenAttributes().get("organization"));
-                this.userService.save(new User(null, keycloakId, email, firstname, lastname,organization));
+                this.userService.save(new User(null, keycloakId, email, firstname, lastname,organization, new ArrayList<>()));
             }
         } catch (Exception e) {
             throw new IllegalArgumentException("Unable to save user");
