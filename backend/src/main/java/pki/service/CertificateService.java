@@ -14,11 +14,8 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import pki.dto.CreateCertificatePartyDTO;
+import pki.dto.*;
 import org.modelmapper.ModelMapper;
-import pki.dto.CreateEndEntityCertificateDTO;
-import pki.dto.CreateIntermediateCertificateDTO;
-import pki.dto.CreateRootCertificateDTO;
 import pki.model.Certificate;
 import pki.model.CertificateParty;
 import pki.model.CertificateType;
@@ -27,12 +24,14 @@ import pki.repository.CertificateRepository;
 import pki.util.KeyStoreReader;
 import pki.util.KeyStoreWriter;
 
+import java.io.IOException;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -70,11 +69,16 @@ public class CertificateService {
 
         Certificate certificate = new Certificate(serialNumber, subject, subject, CertificateType.ROOT);
         certificateRepository.save(certificate);
+        keyStoreReader.downloadCertificate(x509certificate);
     }
 
-    public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, CertIOException {
+    public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, IOException, KeyStoreException {
         //TODO if ca is logged in check if it has permission for issuer cert
-        //TODO check cert chain validity
+
+        CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
+                .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
+        if(!checkCertificateChainValidity(issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate()))
+            throw new IllegalArgumentException("Error validating certificate chain");
 
         CertificateParty subject = modelMapper.map(certificateDTO.getSubject(), CertificateParty.class);
         subject.setId(java.util.UUID.randomUUID().toString());
@@ -82,8 +86,6 @@ public class CertificateService {
         subject.setPrivateKey(keyPair.getPrivate());
         subject.setPublicKey(keyPair.getPublic());
         subject = certificatePartyRepository.save(subject);
-
-        CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId()).orElse(null);
 
         String serialNumber = UUID.randomUUID().toString().replace("-","");
         X509Certificate x509certificate = generateCertificate(subject, issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate(), serialNumber, true);
@@ -98,9 +100,13 @@ public class CertificateService {
         //TODO if ca user add to owned certificates
     }
 
-    public void issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, CertIOException {
+    public void issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, IOException, KeyStoreException {
         //TODO if ca is logged in check if it has permission for issuer cert
-        //TODO check cert chain validity
+
+        CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
+                .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
+        if(!checkCertificateChainValidity(issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate()))
+            throw new IllegalArgumentException("Error validating certificate chain");
 
         CertificateParty subject = modelMapper.map(certificateDTO.getSubject(), CertificateParty.class);
         subject.setId(java.util.UUID.randomUUID().toString());
@@ -108,8 +114,6 @@ public class CertificateService {
         subject.setPrivateKey(keyPair.getPrivate());
         subject.setPublicKey(keyPair.getPublic());
         subject = certificatePartyRepository.save(subject);
-
-        CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId()).orElse(null);
 
         String serialNumber = UUID.randomUUID().toString().replace("-","");
         X509Certificate x509certificate = generateCertificate(subject, issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate(), serialNumber, false);
@@ -182,4 +186,26 @@ public class CertificateService {
 
         return certConverter.getCertificate(certHolder);
     }
+
+    private boolean checkCertificateChainValidity(CertificateParty issuer, Date startDate, Date endDate) throws CertificateException, KeyStoreException, IOException, NoSuchAlgorithmException, NoSuchProviderException { {
+        List<Certificate> certificates = certificateRepository.findBySubject(issuer);
+        if(certificates.isEmpty())
+            return false;
+        Certificate certificate = certificates.get(0);
+        X509Certificate x509Certificate = (X509Certificate) keyStoreReader.readCertificate(keyStoreFilePath, keyStorePassword, certificate.getSerialNumber());
+        try {
+            x509Certificate.verify(issuer.getPublicKey());
+        } catch (InvalidKeyException | SignatureException e) {
+            return false;
+        }
+        if(x509Certificate.getNotBefore().before(startDate) && x509Certificate.getNotAfter().after(endDate))
+            if(certificate.getType()==CertificateType.ROOT)
+                return true;
+            else
+                return checkCertificateChainValidity(certificate.getIssuer(), startDate, endDate);
+        return false;
+        }
+    }
+
+
 }
