@@ -56,7 +56,7 @@ export class KeycloakService {
     return this.keycloak?.token;
   }
 
-  hasRealmRole(role: string): boolean {
+  hasRole(role: string): boolean {
     const token = this.keycloak?.tokenParsed;
     console.log('Checking realm role:', role, 'Token:', token);
     
@@ -68,44 +68,17 @@ export class KeycloakService {
     return false;
   }
 
-  hasClientRole(clientId: string, role: string): boolean {
-    const token = this.keycloak?.tokenParsed;
-    console.log('Checking client role:', role, 'for client:', clientId);
-    
-    if (token && token['resource_access'] && token['resource_access'][clientId]) {
-      const roles = token['resource_access'][clientId]['roles'] || [];
-      console.log(`Available roles for client ${clientId}:`, roles);
-      return roles.includes(role);
-    }
-    return false;
-  }
-
-  hasRole(role: string, clientId?: string): boolean {
-    if (clientId) {
-      return this.hasClientRole(clientId, role);
-    } else {
-      return this.hasRealmRole(role);
-    }
-  }
 
   isAdmin(): boolean {
-    const realmAdmin = this.hasRealmRole('admin');
-    const realmAdminRole = this.hasRealmRole('realm-admin');
-    const clientAdmin = this.hasClientRole('realm-management', 'realm-admin');
-    const customAdmin = this.hasRealmRole('administrator');
-    
-    console.log('Admin check results:', {
-      realmAdmin,
-      realmAdminRole, 
-      clientAdmin,
-      customAdmin
-    });
-    
-    return realmAdmin || realmAdminRole || clientAdmin || customAdmin;
+    return this.hasRole('admin');
   }
 
-  redirectToRegistration() {
-    this.keycloak?.register();
+  isCA(): boolean {
+    return this.hasRole('ca');
+  }
+
+  isUser(): boolean {
+    return this.hasRole('user');
   }
 
   getUserRoles(): string[] {

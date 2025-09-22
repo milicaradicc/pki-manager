@@ -1,39 +1,37 @@
 import { Injectable } from '@angular/core';
-import { CanActivate, Router, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
+import { CanActivate, Router, ActivatedRouteSnapshot } from '@angular/router';
 import { KeycloakService } from '../services/keycloak/keycloak.service';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class AuthGuard implements CanActivate {
+  constructor(private keycloakService: KeycloakService, private router: Router) {}
 
-  constructor(
-    private keycloakService: KeycloakService,
-    private router: Router
-  ) {
-  }
-
-  canActivate(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): boolean {
-
-    if (!this.keycloakService.isLoggedIn()) {
-      this.keycloakService.login();
+  async canActivate(route: ActivatedRouteSnapshot): Promise<boolean> {
+    const isLoggedIn = await this.keycloakService.isLoggedIn();
+    if (!isLoggedIn) {
+      await this.keycloakService.login();
       return false;
     }
 
-    if (state.url !== '/management') {
-      return true;
+    const allowedRoles: string[] = route.data['roles'] || [];
+    const userRoles = this.keycloakService.getUserRoles();
+
+    console.log('User roles:', userRoles);
+
+    const appRoles = userRoles.filter(
+      r => !r.includes(':') && r !== 'offline_access' && r !== 'uma_authorization'
+    );
+
+    const hasRole = allowedRoles.some(role =>
+      appRoles.some(userRole => userRole.toLowerCase() === role.toLowerCase())
+    );
+
+    if (!hasRole) {
+      alert('Nemate pristup ovoj stranici!');
+      this.router.navigate(['/']); 
+      return false;
     }
 
-    const hasAdminRole = this.keycloakService.hasRealmRole('admin') 
-
-    if (hasAdminRole) {
-      console.log('Admin access granted');
-      return true;
-    }
-
-    console.log('User does not have admin privileges');
-    alert('Nemate administratorske privilegije!');
-    this.router.navigate(['/']);
-    return false;
+    return true;
   }
 }
