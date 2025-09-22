@@ -1,10 +1,11 @@
 <nav class="nav">
   <a routerLink="/">Home</a>
 
-  <div class="user-info">
+  <div class="user-info" (click)="goToAccount()">
     <span class="user-icon">👤</span>
     <span class="user-role">User</span>
   </div>
+
 
   <button class="logout-btn" (click)="logout()">Logout</button>
 </nav>

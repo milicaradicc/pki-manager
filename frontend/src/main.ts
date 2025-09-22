@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 
 import { AppComponent } from './app/app.component';
-import { routes } from './app/app.routing.module';
+import { routes } from './app/app.routes';
 import { KeycloakService } from './app/core/keycloak/keycloak.service';
 import { Interceptor } from './app/core/interceptor';
 
