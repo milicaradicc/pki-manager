@@ -207,5 +207,8 @@ public class CertificateService {
         }
     }
 
-
+    public List<GetCertificateDTO> getAllCaCertificates(){
+        List<Certificate> certificates = certificateRepository.findByTypeIn(List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE));
+        return certificates.stream().map(c -> new GetCertificateDTO(c.getIssuer().getId(),c.getIssuer().getCommonName())).toList();
+    }
 }
