@@ -14,6 +14,13 @@ export class UserNavBarComponent  {
 
   constructor(private keycloakService: KeycloakService) {}
 
+  goToAccount() {
+    const accountUrl = this.keycloakService.getAccountUrl();
+    if (accountUrl) {
+      window.location.href = accountUrl; 
+    }
+  }
+
   logout() {
     this.keycloakService.logout();
   }

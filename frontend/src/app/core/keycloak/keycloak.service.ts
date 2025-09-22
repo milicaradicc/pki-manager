@@ -130,4 +130,10 @@ export class KeycloakService {
 
     return token['realm_access']?.roles || [];
   }
+  
+  getAccountUrl(): string {
+    if (!this.keycloak) return '';
+      return `${this.baseUrl}/realms/${this.realm}/account`;
+  }
+
 }
