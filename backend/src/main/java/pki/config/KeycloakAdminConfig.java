@@ -12,7 +12,7 @@ public class KeycloakAdminConfig {
     @Bean
     public Keycloak keycloakAdmin() {
         return KeycloakBuilder.builder()
-                .serverUrl("http://localhost:8080")
+                .serverUrl("https://localhost:9443")
                 .realm("master")
                 .clientId("admin-cli")
                 .grantType(OAuth2Constants.PASSWORD)
