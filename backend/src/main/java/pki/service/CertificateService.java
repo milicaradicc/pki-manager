@@ -22,6 +22,7 @@ import pki.model.CertificateType;
 import pki.model.User;
 import pki.repository.CertificatePartyRepository;
 import pki.repository.CertificateRepository;
+import pki.repository.UserRepository;
 import pki.util.KeyStoreReader;
 import pki.util.KeyStoreWriter;
 
@@ -50,6 +51,8 @@ public class CertificateService {
     private KeyStoreWriter keyStoreWriter;
     @Autowired
     private UserService userService;
+    @Autowired
+    private UserRepository userRepository;
     private ModelMapper modelMapper = new ModelMapper();
 
     public CertificateService(){
@@ -102,7 +105,11 @@ public class CertificateService {
         Certificate certificate = new Certificate(serialNumber, subject, issuer, CertificateType.INTERMEDIATE);
         certificateRepository.save(certificate);
 
-        //TODO if ca user add to owned certificates
+        if(Objects.equals(userService.getPrimaryRole(), "ca")){
+            User user = userService.getLoggedUser();
+            user.getOwnedCertificates().add(certificate);
+            userRepository.save(user);
+        }
     }
 
     public void issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, IOException, KeyStoreException {
@@ -134,8 +141,11 @@ public class CertificateService {
 
         keyStoreReader.downloadCertificate(x509certificate);
 
-        //TODO if ca user add to owned certificates
-        //TODO if ordinary user add to owned certificates
+        if(Objects.equals(userService.getPrimaryRole(), "ca") || Objects.equals(userService.getPrimaryRole(), "user")){
+            User user = userService.getLoggedUser();
+            user.getOwnedCertificates().add(certificate);
+            userRepository.save(user);
+        }
     }
 
     private KeyPair generateKeyPair() throws NoSuchAlgorithmException, NoSuchProviderException {
@@ -234,7 +244,6 @@ public class CertificateService {
             certificates = userService.getLoggedUser().getOwnedCertificates().stream().filter(c -> c.getType()!=CertificateType.END_ENTITY).toList();
         else
             certificates = certificateRepository.findByTypeIn(List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE));
-
         return certificates.stream().map(c -> new GetCertificateDTO(c.getSerialNumber(),c.getSubject().getId(),c.getSubject().getCommonName())).toList();
     }
 }
