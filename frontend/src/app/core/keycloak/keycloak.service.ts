@@ -5,13 +5,14 @@ import { Observable } from 'rxjs';
 import { KeycloakUser } from '../../features/users/models/key-cloakuser.model';
 import { CreateUserRequest } from '../../features/users/models/create-user-request.model';
 import { switchMap } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class KeycloakService {
   private keycloak: Keycloak | undefined;
-  private readonly baseUrl = 'http://localhost:8080';
+  private readonly baseUrl = environment.auth;
   private readonly realm = 'pki';
 
   constructor(private http: HttpClient) { }
@@ -35,7 +36,7 @@ export class KeycloakService {
   }
 
   login() { this.keycloak?.login(); }
-  logout() { this.keycloak?.logout({ redirectUri: 'http://localhost:4200' }); }
+  logout() { this.keycloak?.logout({ redirectUri: environment.frontend }); }
   isLoggedIn(): boolean { return this.keycloak?.authenticated ?? false; }
   getToken(): string | undefined { return this.keycloak?.token; }
 

@@ -9,7 +9,7 @@
         <mat-label>Issuer</mat-label>
         <mat-select formControlName="issuer">
           @for (certificate of allCertificates; track certificate) {
-            <mat-option [value]="certificate">{{certificate.issuerId}} : {{certificate.issuerCommonName}}</mat-option>
+            <mat-option [value]="certificate">{{certificate.subjectId}} : {{certificate.subjectCommonName}}</mat-option>
           }
         </mat-select>
       </mat-form-field>
