@@ -24,6 +24,10 @@ export class CertificateService {
     return this.http.post<void>(`${this.baseUrl}/intermediate`,dto);
   }
 
+  createEndEntityCertificate(dto:CreateIntermediateCertificateDTO): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/end-entity`,dto);
+  }
+
   getAllCaCertificates(): Observable<GetCertificateDto[]> {
     return this.http.get<GetCertificateDto[]>(`${this.baseUrl}/ca`);
   }

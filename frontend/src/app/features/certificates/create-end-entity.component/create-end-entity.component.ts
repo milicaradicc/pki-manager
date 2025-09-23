@@ -1,19 +1,19 @@
-import {Component, inject, OnInit} from '@angular/core';
+import {Component, inject} from '@angular/core';
 import {MatDatepicker, MatDatepickerInput, MatDatepickerToggle} from '@angular/material/datepicker';
 import {MatFormField, MatInput, MatLabel} from '@angular/material/input';
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
 import {MatSnackBar} from '@angular/material/snack-bar';
+import {GetCertificateDto} from '../models/get-certificate-dto.model';
 import {CertificateService} from '../certificate.service';
 import {Router} from '@angular/router';
-import {CreateRootCertificateDTO} from '../models/create-root-certificate-dto.model';
+import {CreateIntermediateCertificateDTO} from '../models/create-intermediate-cetrificate-dto.model';
 import {CreateCertificatePartyDTO} from '../models/create-certificate-party.model';
 import {MatSelectModule} from '@angular/material/select';
-import {GetCertificateDto} from '../models/get-certificate-dto.model';
-import {CreateIntermediateCertificateDTO} from '../models/create-intermediate-cetrificate-dto.model';
-
+import {MatButton} from '@angular/material/button';
+import {CreateEndEntityCertificateDTO} from '../models/create-end-entity-dto.model';
 
 @Component({
-  selector: 'app-create-intermediate',
+  selector: 'app-create-end-entity.component',
   imports: [
     MatDatepicker,
     MatDatepickerInput,
@@ -23,12 +23,13 @@ import {CreateIntermediateCertificateDTO} from '../models/create-intermediate-ce
     MatLabel,
     ReactiveFormsModule,
     MatSelectModule,
+    MatButton,
   ],
-  templateUrl:'./create-intermediate.component.html',
+  templateUrl: './create-end-entity.component.html',
   standalone: true,
-  styleUrl: './create-intermediate.component.css'
+  styleUrl: './create-end-entity.component.css'
 })
-export class CreateIntermediateComponent implements OnInit {
+export class CreateEndEntityComponent {
   createForm!: FormGroup;
   today = new Date();
   snackBar:MatSnackBar = inject(MatSnackBar);
@@ -66,7 +67,7 @@ export class CreateIntermediateComponent implements OnInit {
   save() {
     if (this.createForm.valid) {
       const formValues = this.createForm.value;
-      const dto: CreateIntermediateCertificateDTO = {
+      const dto: CreateEndEntityCertificateDTO = {
         issuerId : formValues.issuer.subjectId,
         subject: {
           commonName: formValues.commonName,
@@ -80,8 +81,8 @@ export class CreateIntermediateComponent implements OnInit {
         startDate: (new Date(formValues.startDate.getTime() - formValues.startDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0],
         endDate: (new Date(formValues.endDate.getTime() - formValues.endDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0],
       };
-      this.certificateService.createIntermediateCertificate(dto).subscribe({
-        next: (createdEvent) => {
+      this.certificateService.createEndEntityCertificate(dto).subscribe({
+        next: () => {
           this.snackBar.open('Certificate created successfully','OK',{duration:3000});
           this.router.navigate(['home']);
         },
