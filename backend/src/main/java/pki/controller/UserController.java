@@ -1,15 +1,19 @@
 package pki.controller;
 
+import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import pki.dto.GetUserDTO;
 import pki.model.User;
 import pki.service.UserService;
 
 @RestController
 @RequestMapping("/user")
 public class UserController {
+    private ModelMapper modelMapper = new ModelMapper();
 
     private final UserService userService;
 
@@ -19,9 +23,9 @@ public class UserController {
 
     @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
     @GetMapping("/profile")
-    public ResponseEntity<User> getUserProfile() {
+    public ResponseEntity<GetUserDTO> getUserProfile() {
         User loggedUser = userService.getLoggedUser();
-        return ResponseEntity.ok(loggedUser);
+        return ResponseEntity.ok(modelMapper.map(loggedUser, GetUserDTO.class));
     }
 
     @GetMapping("/")
