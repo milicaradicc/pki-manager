@@ -8,6 +8,7 @@ import {CreateIntermediateComponent} from './features/certificates/create-interm
 import {
   CreateEndEntityComponent
 } from './features/certificates/create-end-entity.component/create-end-entity.component';
+import { AssignCertificateComponent } from './features/certificates/assign-certificate/assign-certificate.component';
 
 export const routes: Routes = [
   {
@@ -39,6 +40,12 @@ export const routes: Routes = [
     component: CreateEndEntityComponent,
     canActivate: [AuthGuard],
     data: { roles: ['admin','ca','user'] }
+  },
+  {
+    path: 'assign-certificates',
+    component: AssignCertificateComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['admin'] }
   },
   { path: '**', redirectTo: '' }
 ];

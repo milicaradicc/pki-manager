@@ -1,0 +1,33 @@
+<div class="outer-container">
+  <div class="register-container">
+    <form [formGroup]="assignForm" class="elegant-form">
+      <div class="form-header">
+        <h1>Assign Certificates</h1>
+      </div>
+
+      <mat-form-field>
+        <mat-label>Certificate</mat-label>
+        <mat-select formControlName="certificate">
+          @for (certificate of allCertificates; track certificate) {
+            <mat-option [value]="certificate">{{certificate.subjectId}} : {{certificate.subjectCommonName}}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field>
+        <mat-label>CA User</mat-label>
+        <mat-select formControlName="caUser">
+          @for (caUser of caUsers; track caUser.email) {
+            <mat-option [value]="caUser">{{caUser.email}} : {{caUser.username}}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-flat-button color="primary" class="submit-btn"
+              (click)="save()"
+              [disabled]="!assignForm.valid">
+        Submit
+      </button>
+    </form>
+  </div>
+</div>

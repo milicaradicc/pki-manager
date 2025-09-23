@@ -7,12 +7,14 @@ import {CreateRootCertificateDTO} from './models/create-root-certificate-dto.mod
 import {GetCertificateDto} from './models/get-certificate-dto.model';
 import {CreateIntermediateComponent} from './create-intermediate/create-intermediate.component';
 import {CreateIntermediateCertificateDTO} from './models/create-intermediate-cetrificate-dto.model';
+import { environment } from '../../../environments/environment';
+import { AssignCertificateDTO } from './models/assign-certificate.dto';
 
 @Injectable({
   providedIn: 'root'
 })
 export class CertificateService {
-  private baseUrl = 'http://localhost:8081/certificates';
+  private baseUrl = environment.backend + 'certificates';
 
   constructor(private http: HttpClient) {}
 
@@ -30,5 +32,9 @@ export class CertificateService {
 
   getAllCaCertificates(): Observable<GetCertificateDto[]> {
     return this.http.get<GetCertificateDto[]>(`${this.baseUrl}/ca`);
+  }
+
+  assignCertificate(dto:AssignCertificateDTO): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/assign-ca-user`,dto);
   }
 }

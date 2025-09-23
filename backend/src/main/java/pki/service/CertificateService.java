@@ -32,6 +32,7 @@ import java.security.*;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -245,5 +246,18 @@ public class CertificateService {
         else
             certificates = certificateRepository.findByTypeIn(List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE));
         return certificates.stream().map(c -> new GetCertificateDTO(c.getSerialNumber(),c.getSubject().getId(),c.getSubject().getCommonName())).toList();
+    }
+
+    public void assignCaUser(AssignCertificateDTO assignCertificateDTO) {
+        Certificate certificate = certificateRepository.findFirstBySerialNumber(assignCertificateDTO.getCertificateSerialNumber());
+        if (certificate == null)
+            throw new IllegalArgumentException("Certificate with serial number " + assignCertificateDTO.getCertificateSerialNumber() + " not found");
+        User user = userRepository.findByEmail(assignCertificateDTO.getCaUserEmail()).orElseThrow();
+        if (user.getOwnedCertificates() == null)
+            user.setOwnedCertificates(new ArrayList<>());
+        if (user.getOwnedCertificates().stream().anyMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
+            return;
+        user.getOwnedCertificates().add(certificate);
+        userRepository.save(user);
     }
 }
