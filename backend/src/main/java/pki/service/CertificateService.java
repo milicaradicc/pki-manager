@@ -19,6 +19,7 @@ import org.modelmapper.ModelMapper;
 import pki.model.Certificate;
 import pki.model.CertificateParty;
 import pki.model.CertificateType;
+import pki.model.User;
 import pki.repository.CertificatePartyRepository;
 import pki.repository.CertificateRepository;
 import pki.util.KeyStoreReader;
@@ -32,6 +33,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -46,6 +48,8 @@ public class CertificateService {
     private  KeyStoreReader keyStoreReader;
     @Autowired
     private KeyStoreWriter keyStoreWriter;
+    @Autowired
+    private UserService userService;
     private ModelMapper modelMapper = new ModelMapper();
 
     public CertificateService(){
@@ -73,10 +77,11 @@ public class CertificateService {
     }
 
     public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, IOException, KeyStoreException {
-        //TODO if ca is logged in check if it has permission for issuer cert
-
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
+
+        checkCaPermissions(issuer);
+
         if(!checkCertificateChainValidity(issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate()))
             throw new IllegalArgumentException("Error validating certificate chain");
 
@@ -101,10 +106,12 @@ public class CertificateService {
     }
 
     public void issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, IOException, KeyStoreException {
-        //TODO if ca is logged in check if it has permission for issuer cert
 
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
+
+        checkCaPermissions(issuer);
+
         if(!checkCertificateChainValidity(issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate()))
             throw new IllegalArgumentException("Error validating certificate chain");
 
@@ -206,6 +213,19 @@ public class CertificateService {
                 return checkCertificateChainValidity(certificate.getIssuer(), startDate, endDate);
         return false;
         }
+    }
+
+    private void checkCaPermissions(CertificateParty issuer){
+        if(!Objects.equals(userService.getPrimaryRole(), "ca"))
+            return;
+
+        List<Certificate> certificates = certificateRepository.findBySubject(issuer);
+        if(certificates.isEmpty())
+            throw new IllegalArgumentException("Issuer with ID " + issuer.getId() + " not found");
+        Certificate certificate = certificates.get(0);
+        User user = userService.getLoggedUser();
+        if(user.getOwnedCertificates().stream().noneMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
+            throw new IllegalArgumentException("Issuer with ID " + issuer.getId() + " not permitted for logged user");
     }
 
     public List<GetCertificateDTO> getAllCaCertificates(){
