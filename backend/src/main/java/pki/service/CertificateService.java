@@ -228,8 +228,13 @@ public class CertificateService {
             throw new IllegalArgumentException("Issuer with ID " + issuer.getId() + " not permitted for logged user");
     }
 
-    public List<GetCertificateDTO> getAllCaCertificates(){
-        List<Certificate> certificates = certificateRepository.findByTypeIn(List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE));
+    public List<GetCertificateDTO> getAllCaCertificates() {
+        List<Certificate> certificates;
+        if(Objects.equals(userService.getPrimaryRole(), "ca"))
+            certificates = userService.getLoggedUser().getOwnedCertificates().stream().filter(c -> c.getType()!=CertificateType.END_ENTITY).toList();
+        else
+            certificates = certificateRepository.findByTypeIn(List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE));
+
         return certificates.stream().map(c -> new GetCertificateDTO(c.getSerialNumber(),c.getSubject().getId(),c.getSubject().getCommonName())).toList();
     }
 }
