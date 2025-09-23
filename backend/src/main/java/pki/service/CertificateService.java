@@ -35,6 +35,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -49,9 +50,11 @@ public class CertificateService {
     private  KeyStoreReader keyStoreReader;
     @Autowired
     private KeyStoreWriter keyStoreWriter;
-    private ModelMapper modelMapper = new ModelMapper();
+    @Autowired
+    private UserService userService;
     @Autowired
     private UserRepository userRepository;
+    private ModelMapper modelMapper = new ModelMapper();
 
     public CertificateService(){
         Security.addProvider(new BouncyCastleProvider());
@@ -78,10 +81,11 @@ public class CertificateService {
     }
 
     public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, IOException, KeyStoreException {
-        //TODO if ca is logged in check if it has permission for issuer cert
-
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
+
+        checkCaPermissions(issuer);
+
         if(!checkCertificateChainValidity(issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate()))
             throw new IllegalArgumentException("Error validating certificate chain");
 
@@ -102,14 +106,20 @@ public class CertificateService {
         Certificate certificate = new Certificate(serialNumber, subject, issuer, CertificateType.INTERMEDIATE);
         certificateRepository.save(certificate);
 
-        //TODO if ca user add to owned certificates
+        if(Objects.equals(userService.getPrimaryRole(), "ca")){
+            User user = userService.getLoggedUser();
+            user.getOwnedCertificates().add(certificate);
+            userRepository.save(user);
+        }
     }
 
     public void issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, IOException, KeyStoreException {
-        //TODO if ca is logged in check if it has permission for issuer cert
 
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
+
+        checkCaPermissions(issuer);
+
         if(!checkCertificateChainValidity(issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate()))
             throw new IllegalArgumentException("Error validating certificate chain");
 
@@ -132,8 +142,11 @@ public class CertificateService {
 
         keyStoreReader.downloadCertificate(x509certificate);
 
-        //TODO if ca user add to owned certificates
-        //TODO if ordinary user add to owned certificates
+        if(Objects.equals(userService.getPrimaryRole(), "ca") || Objects.equals(userService.getPrimaryRole(), "user")){
+            User user = userService.getLoggedUser();
+            user.getOwnedCertificates().add(certificate);
+            userRepository.save(user);
+        }
     }
 
     private KeyPair generateKeyPair() throws NoSuchAlgorithmException, NoSuchProviderException {
@@ -213,8 +226,25 @@ public class CertificateService {
         }
     }
 
-    public List<GetCertificateDTO> getAllCaCertificates(){
-        List<Certificate> certificates = certificateRepository.findByTypeIn(List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE));
+    private void checkCaPermissions(CertificateParty issuer){
+        if(!Objects.equals(userService.getPrimaryRole(), "ca"))
+            return;
+
+        List<Certificate> certificates = certificateRepository.findBySubject(issuer);
+        if(certificates.isEmpty())
+            throw new IllegalArgumentException("Issuer with ID " + issuer.getId() + " not found");
+        Certificate certificate = certificates.get(0);
+        User user = userService.getLoggedUser();
+        if(user.getOwnedCertificates().stream().noneMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
+            throw new IllegalArgumentException("Issuer with ID " + issuer.getId() + " not permitted for logged user");
+    }
+
+    public List<GetCertificateDTO> getAllCaCertificates() {
+        List<Certificate> certificates;
+        if(Objects.equals(userService.getPrimaryRole(), "ca"))
+            certificates = userService.getLoggedUser().getOwnedCertificates().stream().filter(c -> c.getType()!=CertificateType.END_ENTITY).toList();
+        else
+            certificates = certificateRepository.findByTypeIn(List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE));
         return certificates.stream().map(c -> new GetCertificateDTO(c.getSerialNumber(),c.getSubject().getId(),c.getSubject().getCommonName())).toList();
     }
 
@@ -225,6 +255,8 @@ public class CertificateService {
         User user = userRepository.findByEmail(assignCertificateDTO.getCaUserEmail()).orElseThrow();
         if (user.getOwnedCertificates() == null)
             user.setOwnedCertificates(new ArrayList<>());
+        if (user.getOwnedCertificates().stream().anyMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
+            return;
         user.getOwnedCertificates().add(certificate);
         userRepository.save(user);
     }

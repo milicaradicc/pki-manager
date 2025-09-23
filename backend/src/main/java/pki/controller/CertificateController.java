@@ -26,14 +26,14 @@ public class CertificateController {
     @Autowired
     private CertificateService certificateService;
 
-    @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
+    @PreAuthorize("hasAuthority('ROLE_admin')")
     @PostMapping("/root")
     public ResponseEntity<Void> issueRootCertificate(@RequestBody CreateRootCertificateDTO certificateDTO) throws ParseException, CertificateException, NoSuchAlgorithmException, NoSuchProviderException, OperatorCreationException, CertIOException {
         certificateService.issueRootCertificate(certificateDTO);
         return ResponseEntity.ok( null );
     }
 
-    @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
+    @PreAuthorize("hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
     @PostMapping("/intermediate")
     public ResponseEntity<Void> issueIntermediateCertificate(@RequestBody CreateIntermediateCertificateDTO certificateDTO) throws ParseException, CertificateException, NoSuchAlgorithmException, NoSuchProviderException, OperatorCreationException, IOException, KeyStoreException {
         certificateService.issueIntermediateCertificate(certificateDTO);

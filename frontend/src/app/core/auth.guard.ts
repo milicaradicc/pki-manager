@@ -23,7 +23,7 @@ export class AuthGuard implements CanActivate {
     );
 
     if (!hasAccess) {
-      alert('Nemate pristup ovoj stranici!');
+      alert('You do not have access!');
       this.router.navigate(['/']);
       return false;
     }

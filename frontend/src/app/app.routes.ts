@@ -5,6 +5,9 @@ import { ManagementComponent } from './features/users/management/management.comp
 import { AuthGuard } from './core/auth.guard';
 import {CreateRootComponent} from './features/certificates/create-root/create-root.component';
 import {CreateIntermediateComponent} from './features/certificates/create-intermediate/create-intermediate.component';
+import {
+  CreateEndEntityComponent
+} from './features/certificates/create-end-entity.component/create-end-entity.component';
 import { AssignCertificateComponent } from './features/certificates/assign-certificate/assign-certificate.component';
 
 export const routes: Routes = [
@@ -31,6 +34,12 @@ export const routes: Routes = [
     component: CreateIntermediateComponent,
     canActivate: [AuthGuard],
     data: { roles: ['admin','ca'] }
+  },
+  {
+    path: 'create-end-entity',
+    component: CreateEndEntityComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['admin','ca','user'] }
   },
   {
     path: 'assign-certificates',
