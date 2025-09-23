@@ -8,6 +8,7 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 public class GetCertificateDTO {
-    private String issuerId;
-    private String issuerCommonName;
+    private String serialNumber;
+    private String subjectId;
+    private String subjectCommonName;
 }

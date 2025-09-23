@@ -194,10 +194,11 @@ public class CertificateService {
         Certificate certificate = certificates.get(0);
         X509Certificate x509Certificate = (X509Certificate) keyStoreReader.readCertificate(keyStoreFilePath, keyStorePassword, certificate.getSerialNumber());
         try {
-            x509Certificate.verify(issuer.getPublicKey());
+            x509Certificate.verify(certificate.getIssuer().getPublicKey());
         } catch (InvalidKeyException | SignatureException e) {
             return false;
         }
+
         if(x509Certificate.getNotBefore().before(startDate) && x509Certificate.getNotAfter().after(endDate))
             if(certificate.getType()==CertificateType.ROOT)
                 return true;
@@ -209,6 +210,6 @@ public class CertificateService {
 
     public List<GetCertificateDTO> getAllCaCertificates(){
         List<Certificate> certificates = certificateRepository.findByTypeIn(List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE));
-        return certificates.stream().map(c -> new GetCertificateDTO(c.getIssuer().getId(),c.getIssuer().getCommonName())).toList();
+        return certificates.stream().map(c -> new GetCertificateDTO(c.getSerialNumber(),c.getSubject().getId(),c.getSubject().getCommonName())).toList();
     }
 }
