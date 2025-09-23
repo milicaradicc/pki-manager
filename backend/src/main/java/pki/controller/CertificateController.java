@@ -53,4 +53,11 @@ public class CertificateController {
         List<GetCertificateDTO> certificates = certificateService.getAllCaCertificates();
         return ResponseEntity.ok( certificates );
     }
+
+    @PreAuthorize("hasAuthority('ROLE_admin')")
+    @PostMapping("/assign-ca-user")
+    public ResponseEntity<Void> assignCaUser(@RequestBody AssignCertificateDTO assignCertificateDTO) throws ParseException, CertificateException, NoSuchAlgorithmException, NoSuchProviderException, OperatorCreationException, CertIOException {
+        certificateService.assignCaUser(assignCertificateDTO);
+        return ResponseEntity.ok( null );
+    }
 }
