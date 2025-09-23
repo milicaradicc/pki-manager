@@ -63,7 +63,13 @@
               "buildTarget": "frontend:build:development"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options": {
+            "port": 4200,
+            "ssl": true,
+            "sslKey": "domain-unencrypted.key",
+            "sslCert": "domain.crt"
+          }
         },
         "extract-i18n": {
           "builder": "@angular/build:extract-i18n"

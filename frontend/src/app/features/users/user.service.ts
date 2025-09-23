@@ -16,7 +16,7 @@ export interface User {
   providedIn: 'root'
 })
 export class UserService {
-  private baseUrl = 'http://localhost:8081/user';
+  private baseUrl = 'https://localhost:8443/user';
 
   constructor(private http: HttpClient, private keycloak: KeycloakService) {}
 

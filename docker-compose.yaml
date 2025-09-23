@@ -30,23 +30,31 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.2
     container_name: pki-keycloak
-    command: start-dev
+    command: start
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/pki 
+      KC_DB_URL: jdbc:postgresql://postgres:5432/pki
       KC_DB_USERNAME: user
       KC_DB_PASSWORD: password
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_HOSTNAME_STRICT: false
-      KC_HTTP_ENABLED: true
-      KC_HOSTNAME_STRICT_HTTPS: false  
-      KC_LOG_LEVEL: INFO  
+      KC_HTTP_ENABLED: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_LOG_LEVEL: INFO
+      KC_HTTPS_KEY_STORE_FILE: /opt/keycloak/certs/domain.pfx
+      KC_HTTPS_KEY_STORE_PASSWORD: ${KC_KEYSTORE_PASSWORD}
+      KC_HOSTNAME: localhost
+      KC_PROVIDERS: all
     ports:
-      - '8080:8080'
+      - '9443:8443'
     depends_on:
       postgres:
-        condition: service_healthy  
+        condition: service_healthy
+    volumes:
+      - ./keycloak_certs:/opt/keycloak/certs
+      - ./keycloak_providers:/opt/keycloak/providers
+
 
 volumes:
   postgres_data:
