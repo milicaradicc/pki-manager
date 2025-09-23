@@ -5,13 +5,14 @@ import { Observable } from 'rxjs';
 import { KeycloakUser } from '../../features/users/models/key-cloakuser.model';
 import { CreateUserRequest } from '../../features/users/models/create-user-request.model';
 import { switchMap } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class KeycloakService {
   private keycloak: Keycloak | undefined;
-  private readonly baseUrl = 'https://localhost:9443';
+  private readonly baseUrl = environment.auth;
   private readonly realm = 'pki';
 
   constructor(private http: HttpClient) { }
@@ -35,14 +36,9 @@ export class KeycloakService {
   }
 
   login() { this.keycloak?.login(); }
-  logout() { this.keycloak?.logout({ redirectUri: 'https://localhost:4200' }); }
+  logout() { this.keycloak?.logout({ redirectUri: environment.frontend }); }
   isLoggedIn(): boolean { return this.keycloak?.authenticated ?? false; }
   getToken(): string | undefined { return this.keycloak?.token; }
-
-  async updateTokenIfNeeded(): Promise<void> {
-    if (!this.keycloak) return;
-    await this.keycloak.updateToken(30);
-  }
 
   getAllUsers(): Observable<KeycloakUser[]> {
     return this.http.get<KeycloakUser[]>(`${this.baseUrl}/admin/realms/${this.realm}/users`);
@@ -76,14 +72,6 @@ export class KeycloakService {
 
   getAllRoles(): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/admin/realms/${this.realm}/roles`);
-  }
-
-  setTemporaryPassword(userId: string, password: string): Observable<any> {
-    return this.http.put(`${this.baseUrl}/admin/realms/${this.realm}/users/${userId}/reset-password`, {
-      type: 'password',
-      value: password,
-      temporary: true
-    });
   }
 
   sendVerificationEmail(userId: string): Observable<any> {
@@ -124,10 +112,16 @@ export class KeycloakService {
           this.hasClientRole('realm-management', 'manage-users') ||
           this.hasClientRole('realm-management', 'view-users');
   }
+
   getUserRoles(): string[] {
     const token = this.keycloak?.tokenParsed;
     if (!token) return [];
 
     return token['realm_access']?.roles || [];
+  }
+  
+  getAccountUrl(): string {
+    if (!this.keycloak) return '';
+      return `${this.baseUrl}/realms/${this.realm}/account`;
   }
 }

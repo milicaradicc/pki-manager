@@ -1,0 +1,73 @@
+<div class="outer-container">
+  <div class="register-container">
+    <form [formGroup]="createForm" class="elegant-form">
+      <div class="form-header">
+        <h1>Create Intermediate Certificate</h1>
+      </div>
+
+      <mat-form-field>
+        <mat-label>Issuer</mat-label>
+        <mat-select formControlName="issuer">
+          @for (certificate of allCertificates; track certificate) {
+            <mat-option [value]="certificate">{{certificate.subjectId}} : {{certificate.subjectCommonName}}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Common Name</mat-label>
+        <input matInput formControlName="commonName">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Surname</mat-label>
+        <input matInput formControlName="surname">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Given Name</mat-label>
+        <input matInput formControlName="givenName">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Organization</mat-label>
+        <input matInput formControlName="organization">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Organizational Unit</mat-label>
+        <input matInput formControlName="organizationalUnit">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Country</mat-label>
+        <input matInput formControlName="country">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" formControlName="email">
+      </mat-form-field>
+
+      <mat-form-field>
+        <mat-label>Start Date</mat-label>
+        <input [min]="today" formControlName="startDate" matInput [matDatepicker]="picker1">
+        <mat-datepicker-toggle matIconSuffix [for]="picker1"></mat-datepicker-toggle>
+        <mat-datepicker #picker1></mat-datepicker>
+      </mat-form-field>
+
+      <mat-form-field>
+        <mat-label>End Date</mat-label>
+        <input [min]="createForm.get('startDate')?.value" formControlName="endDate" matInput [matDatepicker]="picker2">
+        <mat-datepicker-toggle matIconSuffix [for]="picker2"></mat-datepicker-toggle>
+        <mat-datepicker #picker2></mat-datepicker>
+      </mat-form-field>
+
+      <button mat-flat-button color="primary" class="submit-btn"
+              (click)="save()"
+              [disabled]="!createForm.valid">
+        Submit
+      </button>
+    </form>
+  </div>
+</div>
