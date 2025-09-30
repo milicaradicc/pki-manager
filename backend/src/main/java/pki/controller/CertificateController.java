@@ -6,11 +6,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import pki.dto.*;
 import pki.model.User;
 import pki.service.CertificateService;
 
 import java.io.IOException;
+import java.security.InvalidKeyException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -45,6 +47,21 @@ public class CertificateController {
     public ResponseEntity<Void> issueEndEntityCertificate(@RequestBody CreateEndEntityCertificateDTO certificateDTO) throws ParseException, CertificateException, NoSuchAlgorithmException, NoSuchProviderException, OperatorCreationException, IOException, KeyStoreException {
         certificateService.issueEndEntityCertificate(certificateDTO);
         return ResponseEntity.ok( null );
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
+    @PostMapping("/csr")
+    public ResponseEntity<?> processCSR(
+            @RequestParam("csrFile") MultipartFile csrFile,
+            @RequestParam("issuerId") String issuerId,
+            @RequestParam("startDate") String startDate,
+            @RequestParam("endDate") String endDate
+    ) throws IOException, ParseException, CertificateException, KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, OperatorCreationException {
+        Date start = new SimpleDateFormat("yyyy-MM-dd").parse(startDate);
+        Date end = new SimpleDateFormat("yyyy-MM-dd").parse(endDate);
+        String csrContent = new String(csrFile.getBytes());
+        certificateService.processCSR(csrContent, issuerId, start, end);
+        return ResponseEntity.ok(null);
     }
 
     @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
