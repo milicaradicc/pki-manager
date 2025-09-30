@@ -1,4 +1,4 @@
-import {Component, inject} from '@angular/core';
+import {Component, inject, OnInit} from '@angular/core';
 import {MatDatepicker, MatDatepickerInput, MatDatepickerToggle} from '@angular/material/datepicker';
 import {MatFormField, MatInput, MatLabel} from '@angular/material/input';
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
@@ -29,7 +29,7 @@ import {CreateEndEntityCertificateDTO} from '../models/create-end-entity-dto.mod
   standalone: true,
   styleUrl: './create-end-entity.component.css'
 })
-export class CreateEndEntityComponent {
+export class CreateEndEntityComponent implements OnInit{
   createForm!: FormGroup;
   today = new Date();
   snackBar:MatSnackBar = inject(MatSnackBar);

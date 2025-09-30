@@ -1,5 +1,9 @@
 package pki.service;
 
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.x500.RDN;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.KeyUsage;
@@ -12,6 +16,9 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequest;
+import org.bouncycastle.util.io.pem.PemReader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import pki.dto.*;
@@ -27,6 +34,7 @@ import pki.util.KeyStoreReader;
 import pki.util.KeyStoreWriter;
 
 import java.io.IOException;
+import java.io.StringReader;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.CertificateEncodingException;
@@ -147,6 +155,52 @@ public class CertificateService {
             user.getOwnedCertificates().add(certificate);
             userRepository.save(user);
         }
+    }
+
+    public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, CertificateException, KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, OperatorCreationException {
+        //TODO: add extensions
+        //TODO: decide if this is only for end-entity users
+        PemReader pemReader = new PemReader(new StringReader(csrContent));
+        byte[] content = pemReader.readPemObject().getContent();
+
+        PKCS10CertificationRequest csr = new PKCS10CertificationRequest(content);
+
+        CertificateParty issuer = certificatePartyRepository.findById(issuerId)
+                .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + issuerId + " not found"));
+
+        if(!checkCertificateChainValidity(issuer, startDate, endDate))
+            throw new IllegalArgumentException("Error validating certificate chain");
+
+        X500Name csrSubject = csr.getSubject();
+
+        CertificateParty subject = new CertificateParty();
+        subject.setCommonName(getRDNValue(csrSubject, BCStyle.CN));
+        subject.setSurname(getRDNValue(csrSubject, BCStyle.SURNAME));
+        subject.setGivenName(getRDNValue(csrSubject, BCStyle.GIVENNAME));
+        subject.setOrganization(getRDNValue(csrSubject, BCStyle.O));
+        subject.setOrganizationalUnit(getRDNValue(csrSubject, BCStyle.OU));
+        subject.setCountry(getRDNValue(csrSubject, BCStyle.C));
+        subject.setEmail(getRDNValue(csrSubject, BCStyle.EmailAddress));
+
+        subject.setPublicKey((new JcaPKCS10CertificationRequest(csr)).getPublicKey());
+
+        subject.setId(java.util.UUID.randomUUID().toString());
+        subject = certificatePartyRepository.save(subject);
+
+        String serialNumber = UUID.randomUUID().toString().replace("-","");
+        X509Certificate x509certificate = generateCertificate(subject, issuer, startDate, endDate, serialNumber, false);
+
+        //TODO: sent certificate to user (it isn't saved in keystore)
+
+        Certificate certificate = new Certificate(serialNumber, subject, issuer, CertificateType.END_ENTITY);
+        certificateRepository.save(certificate);
+
+        keyStoreReader.downloadCertificate(x509certificate);
+    }
+
+    private  String getRDNValue(X500Name name, ASN1ObjectIdentifier oid) {
+        RDN rdn = name.getRDNs(oid).length > 0 ? name.getRDNs(oid)[0] : null;
+        return rdn != null ? rdn.getFirst().getValue().toString() : null;
     }
 
     private KeyPair generateKeyPair() throws NoSuchAlgorithmException, NoSuchProviderException {

@@ -9,6 +9,7 @@ import {
   CreateEndEntityComponent
 } from './features/certificates/create-end-entity.component/create-end-entity.component';
 import { AssignCertificateComponent } from './features/certificates/assign-certificate/assign-certificate.component';
+import {CreateCsrComponent} from './features/certificates/create-csr/create-csr.component';
 
 export const routes: Routes = [
   {
@@ -46,6 +47,12 @@ export const routes: Routes = [
     component: AssignCertificateComponent,
     canActivate: [AuthGuard],
     data: { roles: ['admin'] }
+  },
+  {
+    path: 'upload-csr',
+    component: CreateCsrComponent,
+    canActivate: [AuthGuard],
+    data: { roles: ['user'] }
   },
   { path: '**', redirectTo: '' }
 ];
