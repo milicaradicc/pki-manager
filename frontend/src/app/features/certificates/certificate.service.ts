@@ -9,6 +9,7 @@ import {CreateIntermediateComponent} from './create-intermediate/create-intermed
 import {CreateIntermediateCertificateDTO} from './models/create-intermediate-cetrificate-dto.model';
 import { environment } from '../../../environments/environment';
 import { AssignCertificateDTO } from './models/assign-certificate.dto';
+import {FormBuilder} from '@angular/forms';
 
 @Injectable({
   providedIn: 'root'
@@ -28,6 +29,10 @@ export class CertificateService {
 
   createEndEntityCertificate(dto:CreateIntermediateCertificateDTO): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/end-entity`,dto);
+  }
+
+  sendCSR(formData:FormData): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/csr`,formData);
   }
 
   getAllCaCertificates(): Observable<GetCertificateDto[]> {
