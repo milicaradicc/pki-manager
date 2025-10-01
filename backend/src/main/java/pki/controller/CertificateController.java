@@ -75,4 +75,11 @@ public class CertificateController {
         certificateService.assignCaUser(assignCertificateDTO);
         return ResponseEntity.ok( null );
     }
+    @PreAuthorize("hasAuthority('ROLE_admin')")
+    @GetMapping
+    public ResponseEntity<List<GetCertificateDTO>> getAllCertificates() {
+        List<GetCertificateDTO> certificates = certificateService.getAllCertificates();
+        return ResponseEntity.ok(certificates);
+    }
+
 }

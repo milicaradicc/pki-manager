@@ -338,11 +338,21 @@ public class CertificateService {
 
     public List<GetCertificateDTO> getAllCaCertificates() {
         List<Certificate> certificates;
-        if(Objects.equals(userService.getPrimaryRole(), "ca"))
-            certificates = userService.getLoggedUser().getOwnedCertificates().stream().filter(c -> c.getType()!=CertificateType.END_ENTITY).toList();
-        else
-            certificates = certificateRepository.findByTypeIn(List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE));
-        return certificates.stream().map(c -> new GetCertificateDTO(c.getSerialNumber(),c.getSubject().getId(),c.getSubject().getCommonName())).toList();
+        if(Objects.equals(userService.getPrimaryRole(), "ca")) {
+            certificates = userService.getLoggedUser()
+                    .getOwnedCertificates()
+                    .stream()
+                    .filter(c -> c.getType() != CertificateType.END_ENTITY)
+                    .toList();
+        } else {
+            certificates = certificateRepository.findByTypeIn(
+                    List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE)
+            );
+        }
+
+        return certificates.stream()
+                .map(this::mapToGetCertificateDTO)
+                .toList();
     }
 
     public void assignCaUser(AssignCertificateDTO assignCertificateDTO) {
@@ -356,5 +366,50 @@ public class CertificateService {
             return;
         user.getOwnedCertificates().add(certificate);
         userRepository.save(user);
+    }
+
+    public List<GetCertificateDTO> getAllCertificates() {
+        return certificateRepository.findAll()
+                .stream()
+                .map(this::mapToGetCertificateDTO)
+                .toList();
+    }
+
+
+    private GetCertificateDTO mapToGetCertificateDTO(Certificate certificate) {
+        if (certificate == null) {
+            return null;
+        }
+
+        CertificateParty subject = certificate.getSubject();
+        CertificateParty issuer = certificate.getIssuer();
+        Organization org = certificate.getOrganization();
+
+        return new GetCertificateDTO(
+                certificate.getSerialNumber(),
+
+                // Subject fields
+                subject != null ? subject.getCommonName() : null,
+                subject != null ? subject.getSurname() : null,
+                subject != null ? subject.getGivenName() : null,
+                subject != null ? subject.getOrganization() : null,
+                subject != null ? subject.getOrganizationalUnit() : null,
+                subject != null ? subject.getCountry() : null,
+                subject != null ? subject.getEmail() : null,
+
+                // Issuer fields
+                issuer != null ? issuer.getCommonName() : null,
+                issuer != null ? issuer.getSurname() : null,
+                issuer != null ? issuer.getGivenName() : null,
+                issuer != null ? issuer.getOrganization() : null,
+                issuer != null ? issuer.getOrganizationalUnit() : null,
+                issuer != null ? issuer.getCountry() : null,
+                issuer != null ? issuer.getEmail() : null,
+
+                certificate.getType(),
+                org != null ? org.getName() : null,
+                certificate.getStartDate(),
+                certificate.getEndDate()
+        );
     }
 }

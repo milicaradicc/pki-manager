@@ -130,4 +130,11 @@ export class KeycloakService {
     if (!token) return '';
     return token['organization'] || undefined;
   }
+  getUserRole(): string {
+    const roles = this.getUserRoles();
+    if (roles.includes('admin')) return 'admin';
+    if (roles.includes('ca')) return 'ca';
+    if (roles.includes('user')) return 'user';
+    return '';
+  }
 }

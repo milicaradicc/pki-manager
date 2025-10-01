@@ -30,8 +30,4 @@ public class Certificate {
 
     private Date startDate;
     private Date endDate;
-
-//    private boolean revoked;
-//    private String revocationReason;
-//    private String revocationDate;
 }
