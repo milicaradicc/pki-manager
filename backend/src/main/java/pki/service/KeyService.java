@@ -47,6 +47,12 @@ public class KeyService {
                 .generatePrivate(new PKCS8EncodedKeySpec(privateKeyBytes));
     }
 
+    public String unwrapDek(String wrappedDek, String adminWrappedKek) throws GeneralSecurityException {
+        byte[] kekBytes = unwrapKey(adminWrappedKek, getMasterKeyBytes());
+        byte[] dekBytes = unwrapKey(wrappedDek, kekBytes);
+        return Base64.getEncoder().encodeToString(dekBytes);
+    }
+
 
     public static KeyPair generateKeyPair() throws NoSuchAlgorithmException, NoSuchProviderException {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance(ASYMMETRIC_KEY_ALGORITHM);

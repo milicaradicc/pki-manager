@@ -22,6 +22,7 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequest;
 import org.bouncycastle.util.io.pem.PemReader;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pki.dto.*;
 import org.modelmapper.ModelMapper;
@@ -51,7 +52,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class CertificateService {
-    private static final String keyStorePassword = "password";
+    @Value("${app.admin-wrapped-kek}")
+    private String adminWrappedKek;
+
     private static final String keyStoreFilePath = "src/main/resources/static/certificates.jks";
 
     private final CertificateRepository certificateRepository;
@@ -61,28 +64,43 @@ public class CertificateService {
     private final UserService userService;
     private final UserRepository userRepository;
     private final ModelMapper modelMapper = new ModelMapper();
+    private final KeyService keyService;
 
     @PostConstruct
     private void init() {
         Security.addProvider(new BouncyCastleProvider());
     }
 
-    public void issueRootCertificate(CreateRootCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, CertIOException {
+    public void issueRootCertificate(CreateRootCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, CertIOException {
+        KeyPair keyPair = KeyService.generateKeyPair();
+        String wrappedDek = keyService.generateWrappedDek(adminWrappedKek);
+        String wrappedPrivateKey = keyService.wrapPrivateKey(keyPair.getPrivate(), wrappedDek, adminWrappedKek);
+
         CertificateParty subject = modelMapper.map(certificateDTO.getSubject(), CertificateParty.class);
         subject.setId(java.util.UUID.randomUUID().toString());
-        KeyPair keyPair = generateKeyPair();
-        subject.setPrivateKey(keyPair.getPrivate());
-        subject.setPublicKey(keyPair.getPublic());
         subject = certificatePartyRepository.save(subject);
 
         String serialNumber = UUID.randomUUID().toString().replace("-","");
-        X509Certificate x509certificate = generateCertificate(subject, subject, certificateDTO.getStartDate(), certificateDTO.getEndDate(), serialNumber, true);
 
-        keyStoreWriter.loadKeyStore(keyStoreFilePath,  keyStorePassword.toCharArray());
-        keyStoreWriter.write(serialNumber, subject.getPrivateKey(), keyStorePassword.toCharArray() , x509certificate);
-        keyStoreWriter.saveKeyStore(keyStoreFilePath,  keyStorePassword.toCharArray());
+        Certificate certificate = Certificate.builder()
+                .serialNumber(serialNumber)
+                .subject(subject)
+                .issuer(subject)
+                .type(CertificateType.ROOT)
+                .publicKey(keyPair.getPublic())
+                .wrappedPrivateKey(wrappedPrivateKey)
+                .wrappedDek(wrappedDek)
+                .startDate(certificateDTO.getStartDate())
+                .endDate(certificateDTO.getEndDate())
+                .build();
 
-        Certificate certificate = new Certificate(serialNumber, subject, subject, CertificateType.ROOT);
+        X509Certificate x509certificate = generateCertificate(certificate, keyPair.getPrivate(), true);
+
+        char[] password = keyService.unwrapDek(wrappedDek, adminWrappedKek).toCharArray();
+        keyStoreWriter.loadKeyStore(keyStoreFilePath,  password);
+        keyStoreWriter.write(serialNumber, keyPair.getPrivate(), password , x509certificate);
+        keyStoreWriter.saveKeyStore(keyStoreFilePath,  password);
+
         certificateRepository.save(certificate);
         keyStoreReader.downloadCertificate(x509certificate);
     }
@@ -202,17 +220,17 @@ public class CertificateService {
         return rdn != null ? rdn.getFirst().getValue().toString() : null;
     }
 
-    private X509Certificate generateCertificate(CertificateParty subject, CertificateParty issuer, Date startDate, Date endDate, String serialNumber, boolean isCa) throws CertificateException, OperatorCreationException, CertIOException {
+    private X509Certificate generateCertificate(Certificate certificate, PrivateKey issuerPrivateKey, boolean isCa) throws CertificateException, OperatorCreationException, CertIOException {
         JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
         builder = builder.setProvider("BC");
-        ContentSigner contentSigner = builder.build(issuer.getPrivateKey());
+        ContentSigner contentSigner = builder.build(issuerPrivateKey);
 
-        X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(issuer.getX500Name(),
-                new BigInteger(serialNumber, 16),
-                startDate,
-                endDate,
-                subject.getX500Name(),
-                subject.getPublicKey());
+        X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(certificate.getIssuer().getX500Name(),
+                new BigInteger(certificate.getSerialNumber(), 16),
+                certificate.getStartDate(),
+                certificate.getEndDate(),
+                certificate.getSubject().getX500Name(),
+                certificate.getPublicKey());
 
         if (isCa) {
             certGen.addExtension(
@@ -258,7 +276,7 @@ public class CertificateService {
         Certificate certificate = certificates.get(0);
         X509Certificate x509Certificate = (X509Certificate) keyStoreReader.readCertificate(keyStoreFilePath, keyStorePassword, certificate.getSerialNumber());
         try {
-            x509Certificate.verify(certificate.getIssuer().getPublicKey());
+            x509Certificate.verify(certificate.getPublicKey());
         } catch (InvalidKeyException | SignatureException e) {
             return false;
         }
