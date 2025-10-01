@@ -10,8 +10,10 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/initdb:/docker-entrypoint-initdb.d
+      - ./db/scripts:/scripts
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d pki"]
+      test: ["CMD-SHELL", "sh /scripts/healthcheck.sh"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -33,7 +35,7 @@ services:
     command: start
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/pki
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: user
       KC_DB_PASSWORD: password
       KEYCLOAK_ADMIN: admin

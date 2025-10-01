@@ -7,6 +7,9 @@ import pki.model.CertificateType;
 import pki.model.Organization;
 
 import java.util.List;
+import java.util.Optional;
 
-public interface OrganizationRepository extends JpaRepository<Organization,String> {
+public interface OrganizationRepository extends JpaRepository<Organization,Integer> {
+    Optional<Organization> findByName(String name);
+    boolean existsByName(String name);
 }
