@@ -6,9 +6,7 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
-import org.bouncycastle.asn1.x509.BasicConstraints;
-import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.asn1.x509.KeyUsage;
+import org.bouncycastle.asn1.x509.*;
 import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
@@ -21,7 +19,6 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequest;
 import org.bouncycastle.util.io.pem.PemReader;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pki.dto.*;
@@ -30,6 +27,7 @@ import pki.model.*;
 import pki.model.Certificate;
 import pki.repository.CertificatePartyRepository;
 import pki.repository.CertificateRepository;
+import pki.repository.RevokedCertificateRepository;
 import pki.repository.UserRepository;
 import pki.util.KeyStoreReader;
 import pki.util.KeyStoreWriter;
@@ -38,7 +36,6 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigInteger;
 import java.security.*;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -59,6 +56,7 @@ public class CertificateService {
 
     private final CertificateRepository certificateRepository;
     private final CertificatePartyRepository certificatePartyRepository;
+    private final RevokedCertificateRepository revokedCertificateRepository;
     private final KeyStoreReader keyStoreReader;
     private final KeyStoreWriter keyStoreWriter;
     private final UserService userService;
@@ -116,6 +114,7 @@ public class CertificateService {
     private void issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
+        checkRevocation(issuer);
         Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuer);
         if(issuerCertificate == null)
             throw new IllegalArgumentException("Certificate of issuer with ID " + certificateDTO.getIssuerId() + " not found");
@@ -250,17 +249,21 @@ public class CertificateService {
         return rdn != null ? rdn.getFirst().getValue().toString() : null;
     }
 
-    private X509Certificate generateCertificate(Certificate certificate, PrivateKey issuerPrivateKey, boolean isCa) throws CertificateException, OperatorCreationException, CertIOException {
+    private X509Certificate generateCertificate(Certificate certificate, PrivateKey issuerPrivateKey, boolean isCa)
+            throws CertificateException, OperatorCreationException, CertIOException {
+
         JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
         builder = builder.setProvider("BC");
         ContentSigner contentSigner = builder.build(issuerPrivateKey);
 
-        X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(certificate.getIssuer().getX500Name(),
+        X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(
+                certificate.getIssuer().getX500Name(),
                 new BigInteger(certificate.getSerialNumber(), 16),
                 certificate.getStartDate(),
                 certificate.getEndDate(),
                 certificate.getSubject().getX500Name(),
-                certificate.getPublicKey());
+                certificate.getPublicKey()
+        );
 
         if (isCa) {
             certGen.addExtension(
@@ -274,8 +277,7 @@ public class CertificateService {
                     true,
                     new KeyUsage(KeyUsage.keyCertSign | KeyUsage.cRLSign)
             );
-        }
-        else {
+        } else {
             certGen.addExtension(
                     Extension.basicConstraints,
                     true,
@@ -287,9 +289,16 @@ public class CertificateService {
                     true,
                     new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment)
             );
+
+            // crl distribution point
+            DistributionPointName distPoint = new DistributionPointName(
+                    new GeneralNames(
+                            new GeneralName(GeneralName.uniformResourceIdentifier, "http://localhost:8080/crl/download")
+                    )
+            );
+            DistributionPoint[] distPoints = new DistributionPoint[]{new DistributionPoint(distPoint, null, null)};
+            certGen.addExtension(Extension.cRLDistributionPoints, false, new CRLDistPoint(distPoints));
         }
-
-
 
         X509CertificateHolder certHolder = certGen.build(contentSigner);
 
@@ -375,6 +384,36 @@ public class CertificateService {
                 .toList();
     }
 
+    public void revokeCertificate(String serialNumber, String reason) {
+        Certificate certificate = certificateRepository.findFirstBySerialNumber(serialNumber);
+        if(certificate == null) throw new IllegalArgumentException("Certificate not found");
+
+        RevocationReason rr = RevocationReason.valueOf(reason); // frontend šalje npr. "KEY_COMPROMISE"
+
+        RevokedCertificate revokedCertificate = new RevokedCertificate();
+        revokedCertificate.setSerialNumber(serialNumber);
+        revokedCertificate.setRevokedAt(new Date());
+        revokedCertificate.setReasonCode(rr);
+        revokedCertificate.setIssuerId(certificate.getIssuer().getId());
+
+        revokedCertificateRepository.save(revokedCertificate);
+    }
+
+    public Certificate getRootCertificate() {
+        return certificateRepository.findFirstByType(CertificateType.ROOT);
+    }
+
+    public PrivateKey getIssuerPrivateKey(Certificate certificate) throws GeneralSecurityException {
+        if (certificate == null) {
+            throw new IllegalArgumentException("Certificate cannot be null");
+        }
+
+        String wrappedDek = certificate.getWrappedDek();
+        String wrappedPrivateKey = certificate.getWrappedPrivateKey();
+        String wrappedKek = certificate.getOrganization() != null ? certificate.getOrganization().getWrappedKek() : adminWrappedKek;
+
+        return keyService.unwrapPrivateKey(wrappedPrivateKey, wrappedDek, wrappedKek);
+    }
 
     private GetCertificateDTO mapToGetCertificateDTO(Certificate certificate) {
         if (certificate == null) {
@@ -411,5 +450,13 @@ public class CertificateService {
                 certificate.getStartDate(),
                 certificate.getEndDate()
         );
+    }
+
+    private void checkRevocation(CertificateParty issuer) {
+        boolean revoked = revokedCertificateRepository.existsBySerialNumber(
+                certificateRepository.findFirstBySubject(issuer).getSerialNumber()
+        );
+        if(revoked)
+            throw new IllegalArgumentException("Issuer certificate is revoked");
     }
 }

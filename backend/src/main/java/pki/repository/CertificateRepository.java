@@ -12,4 +12,5 @@ public interface CertificateRepository extends JpaRepository<Certificate,String>
     Certificate findFirstBySubject(CertificateParty subject);
     List<Certificate> findByTypeIn(List<CertificateType> types);
     Certificate findFirstBySerialNumber(String serialNumber);
+    Certificate findFirstByType(CertificateType type);
 }

@@ -245,4 +245,52 @@
       </div>
     </div>
   </div>
+
+  <!-- Revocation Modal -->
+  <div *ngIf="showRevocationPopup" class="modal-overlay" (click)="cancelRevocation()">
+    <div class="modal-content modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Revoke Certificate</h2>
+        <button class="close-btn" (click)="cancelRevocation()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="revocation-warning">
+          <strong>Warning:</strong> This action cannot be undone. Please select a revocation reason.
+        </div>
+        
+        <div class="form-group">
+          <label for="revocationReason">Revocation Reason <span class="required">*</span></label>
+          <select 
+            id="revocationReason" 
+            class="form-select" 
+            [(ngModel)]="selectedReason"
+            [disabled]="loading">
+            <option [ngValue]="null">Select a reason...</option>
+            <option *ngFor="let reason of revocationReasons" [ngValue]="reason">
+              {{ formatRevocationReason(reason) }}
+            </option>
+          </select>
+        </div>
+
+        <div class="certificate-info">
+          <label>Certificate Serial Number:</label>
+          <span class="serial-display">{{ revokingCertificateSerial }}</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button 
+          class="btn btn-secondary" 
+          (click)="cancelRevocation()"
+          [disabled]="loading">
+          Cancel
+        </button>
+        <button 
+          class="btn btn-danger" 
+          (click)="confirmRevocation()"
+          [disabled]="!selectedReason || loading">
+          Confirm Revocation
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
