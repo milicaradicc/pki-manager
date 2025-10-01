@@ -26,10 +26,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pki.dto.*;
 import org.modelmapper.ModelMapper;
+import pki.model.*;
 import pki.model.Certificate;
-import pki.model.CertificateParty;
-import pki.model.CertificateType;
-import pki.model.User;
 import pki.repository.CertificatePartyRepository;
 import pki.repository.CertificateRepository;
 import pki.repository.UserRepository;
@@ -105,34 +103,64 @@ public class CertificateService {
         keyStoreReader.downloadCertificate(x509certificate);
     }
 
-    public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, IOException, KeyStoreException {
+    public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
+        Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuer);
+        if(issuerCertificate == null)
+            throw new IllegalArgumentException("Certificate of issuer with ID " + certificateDTO.getIssuerId() + " not found");
 
         checkCaPermissions(issuer);
 
         if(!checkCertificateChainValidity(issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate()))
             throw new IllegalArgumentException("Error validating certificate chain");
 
+        User user = userService.getLoggedUser();
+        KeyPair keyPair = KeyService.generateKeyPair();
+        String wrappedKek;
+        if (userService.getPrimaryRole().equals("admin"))
+            wrappedKek = adminWrappedKek;
+        else if (user.getOrganization() != null)
+            wrappedKek = user.getOrganization().getWrappedKek();
+        else
+            throw new IllegalArgumentException("Logged user does not have an organization");
+
+        String wrappedDek = keyService.generateWrappedDek(wrappedKek);
+        String wrappedPrivateKey = keyService.wrapPrivateKey(keyPair.getPrivate(), wrappedDek, wrappedKek);
+
         CertificateParty subject = modelMapper.map(certificateDTO.getSubject(), CertificateParty.class);
         subject.setId(java.util.UUID.randomUUID().toString());
-        KeyPair keyPair = generateKeyPair();
-        subject.setPrivateKey(keyPair.getPrivate());
-        subject.setPublicKey(keyPair.getPublic());
         subject = certificatePartyRepository.save(subject);
 
         String serialNumber = UUID.randomUUID().toString().replace("-","");
-        X509Certificate x509certificate = generateCertificate(subject, issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate(), serialNumber, true);
 
-        keyStoreWriter.loadKeyStore(keyStoreFilePath,  keyStorePassword.toCharArray());
-        keyStoreWriter.write(serialNumber, subject.getPrivateKey(), keyStorePassword.toCharArray() , x509certificate);
-        keyStoreWriter.saveKeyStore(keyStoreFilePath,  keyStorePassword.toCharArray());
+        Certificate certificate = Certificate.builder()
+                .serialNumber(serialNumber)
+                .subject(subject)
+                .issuer(issuer)
+                .type(CertificateType.INTERMEDIATE)
+                .publicKey(keyPair.getPublic())
+                .wrappedPrivateKey(wrappedPrivateKey)
+                .wrappedDek(wrappedDek)
+                .startDate(certificateDTO.getStartDate())
+                .endDate(certificateDTO.getEndDate())
+                .organization(user.getOrganization())
+                .build();
 
-        Certificate certificate = new Certificate(serialNumber, subject, issuer, CertificateType.INTERMEDIATE);
+        String issuerWrappedKek = issuerCertificate.getOrganization() != null ? issuerCertificate.getOrganization().getWrappedKek() : adminWrappedKek;
+        PrivateKey issuerPrivateKey = keyService.unwrapPrivateKey(issuerCertificate.getWrappedPrivateKey(),
+                                                                    issuerCertificate.getWrappedDek(),
+                                                                    issuerWrappedKek);
+        X509Certificate x509certificate = generateCertificate(certificate, issuerPrivateKey, true);
+
+        char[] password = keyService.unwrapDek(wrappedDek, wrappedKek).toCharArray();
+        keyStoreWriter.loadKeyStore(keyStoreFilePath,  password);
+        keyStoreWriter.write(serialNumber, keyPair.getPrivate(), password , x509certificate);
+        keyStoreWriter.saveKeyStore(keyStoreFilePath,  password);
+
         certificateRepository.save(certificate);
 
         if(Objects.equals(userService.getPrimaryRole(), "ca")){
-            User user = userService.getLoggedUser();
             user.getOwnedCertificates().add(certificate);
             userRepository.save(user);
         }
@@ -269,12 +297,15 @@ public class CertificateService {
         return certConverter.getCertificate(certHolder);
     }
 
-    private boolean checkCertificateChainValidity(CertificateParty issuer, Date startDate, Date endDate) throws CertificateException, KeyStoreException, IOException, NoSuchAlgorithmException, NoSuchProviderException { {
-        List<Certificate> certificates = certificateRepository.findBySubject(issuer);
-        if(certificates.isEmpty())
+    private boolean checkCertificateChainValidity(CertificateParty issuer, Date startDate, Date endDate) throws GeneralSecurityException, IOException { {
+        Certificate certificate = certificateRepository.findFirstBySubject(issuer);
+        if(certificate == null)
             return false;
-        Certificate certificate = certificates.get(0);
-        X509Certificate x509Certificate = (X509Certificate) keyStoreReader.readCertificate(keyStoreFilePath, keyStorePassword, certificate.getSerialNumber());
+
+        Organization organization = certificate.getOrganization();
+        String wrappedKek = organization != null ? organization.getWrappedKek() : adminWrappedKek;
+        String password = keyService.unwrapDek(certificate.getWrappedDek(), wrappedKek);
+        X509Certificate x509Certificate = (X509Certificate) keyStoreReader.readCertificate(keyStoreFilePath, password, certificate.getSerialNumber());
         try {
             x509Certificate.verify(certificate.getPublicKey());
         } catch (InvalidKeyException | SignatureException e) {

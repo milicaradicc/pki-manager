@@ -1,9 +1,6 @@
 package pki.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.*;
 import lombok.*;
 
 import java.security.PublicKey;
@@ -23,6 +20,8 @@ public class Certificate {
     @ManyToOne
     private CertificateParty issuer;
     private CertificateType type;
+    @ManyToOne
+    private Organization organization;
 
     private PublicKey publicKey;
     private String wrappedPrivateKey;
