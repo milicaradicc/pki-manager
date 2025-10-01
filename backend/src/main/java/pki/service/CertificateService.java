@@ -104,6 +104,14 @@ public class CertificateService {
     }
 
     public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
+        issueNonRootCertificate(certificateDTO, true);
+    }
+
+    public void issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
+        issueNonRootCertificate(certificateDTO, false);
+    }
+
+    private void issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
         Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuer);
@@ -138,7 +146,7 @@ public class CertificateService {
                 .serialNumber(serialNumber)
                 .subject(subject)
                 .issuer(issuer)
-                .type(CertificateType.INTERMEDIATE)
+                .type(intermediate ? CertificateType.INTERMEDIATE : CertificateType.END_ENTITY)
                 .publicKey(keyPair.getPublic())
                 .wrappedPrivateKey(wrappedPrivateKey)
                 .wrappedDek(wrappedDek)
@@ -149,9 +157,9 @@ public class CertificateService {
 
         String issuerWrappedKek = issuerCertificate.getOrganization() != null ? issuerCertificate.getOrganization().getWrappedKek() : adminWrappedKek;
         PrivateKey issuerPrivateKey = keyService.unwrapPrivateKey(issuerCertificate.getWrappedPrivateKey(),
-                                                                    issuerCertificate.getWrappedDek(),
-                                                                    issuerWrappedKek);
-        X509Certificate x509certificate = generateCertificate(certificate, issuerPrivateKey, true);
+                issuerCertificate.getWrappedDek(),
+                issuerWrappedKek);
+        X509Certificate x509certificate = generateCertificate(certificate, issuerPrivateKey, intermediate);
 
         char[] password = keyService.unwrapDek(wrappedDek, wrappedKek).toCharArray();
         keyStoreWriter.loadKeyStore(keyStoreFilePath,  password);
@@ -160,43 +168,10 @@ public class CertificateService {
 
         certificateRepository.save(certificate);
 
-        if(Objects.equals(userService.getPrimaryRole(), "ca")){
-            user.getOwnedCertificates().add(certificate);
-            userRepository.save(user);
-        }
-    }
-
-    public void issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws NoSuchAlgorithmException, NoSuchProviderException, CertificateException, OperatorCreationException, IOException, KeyStoreException {
-
-        CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
-                .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
-
-        checkCaPermissions(issuer);
-
-        if(!checkCertificateChainValidity(issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate()))
-            throw new IllegalArgumentException("Error validating certificate chain");
-
-        CertificateParty subject = modelMapper.map(certificateDTO.getSubject(), CertificateParty.class);
-        subject.setId(java.util.UUID.randomUUID().toString());
-        KeyPair keyPair = KeyService.generateKeyPair();
-        subject.setPrivateKey(keyPair.getPrivate());
-        subject.setPublicKey(keyPair.getPublic());
-        subject = certificatePartyRepository.save(subject);
-
-        String serialNumber = UUID.randomUUID().toString().replace("-","");
-        X509Certificate x509certificate = generateCertificate(subject, issuer, certificateDTO.getStartDate(), certificateDTO.getEndDate(), serialNumber, false);
-
-        keyStoreWriter.loadKeyStore(keyStoreFilePath,  keyStorePassword.toCharArray());
-        keyStoreWriter.write(serialNumber, subject.getPrivateKey(), keyStorePassword.toCharArray() , x509certificate);
-        keyStoreWriter.saveKeyStore(keyStoreFilePath,  keyStorePassword.toCharArray());
-
-        Certificate certificate = new Certificate(serialNumber, subject, issuer, CertificateType.END_ENTITY);
-        certificateRepository.save(certificate);
-
-        keyStoreReader.downloadCertificate(x509certificate);
-
-        if(Objects.equals(userService.getPrimaryRole(), "ca") || Objects.equals(userService.getPrimaryRole(), "user")){
-            User user = userService.getLoggedUser();
+        boolean isCa = Objects.equals(userService.getPrimaryRole(), "ca");
+        boolean isUser = Objects.equals(userService.getPrimaryRole(), "user");
+        if((intermediate && isCa) || (!intermediate && (isCa || isUser)))
+        {
             user.getOwnedCertificates().add(certificate);
             userRepository.save(user);
         }
