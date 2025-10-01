@@ -14,7 +14,6 @@ import lombok.Setter;
 public class Organization {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
     private String name;
     private String wrappedKek;
 
