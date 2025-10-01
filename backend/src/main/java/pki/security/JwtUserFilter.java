@@ -40,6 +40,8 @@ public class JwtUserFilter extends OncePerRequestFilter {
                 String lastname = String.valueOf(token.getTokenAttributes().get("family_name"));
                 String organizationName = String.valueOf(token.getTokenAttributes().get("organization"));
                 Organization organization;
+                if (organizationName == null || organizationName.isEmpty() || organizationName.equals("null"))
+                    organization = null;
                 if (organizationService.exists(organizationName))
                     organization = organizationService.getByName(organizationName);
                 else

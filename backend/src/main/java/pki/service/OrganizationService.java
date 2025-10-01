@@ -18,7 +18,7 @@ public class OrganizationService {
 
     public Organization create(CreateOrganizationDTO createOrganizationDTO) throws GeneralSecurityException {
         Organization organization = new Organization();
-        if (organizationRepository.existsByName(createOrganizationDTO.getName()))
+        if (exists(createOrganizationDTO.getName()))
             throw new IllegalArgumentException("Organization with name " + createOrganizationDTO.getName() + " already exists");
         organization.setName(createOrganizationDTO.getName());
         organization.setWrappedKek(keyService.generateWrappedKek());
@@ -26,11 +26,11 @@ public class OrganizationService {
     }
 
     public boolean exists(String name) {
-        return organizationRepository.existsByName(name);
+        return organizationRepository.findByNameCaseInsensitive(name).isPresent();
     }
 
     public Organization getByName(String name) {
-        return organizationRepository.findByName(name).orElse(null);
+        return organizationRepository.findByNameCaseInsensitive(name).orElse(null);
     }
 
     public List<GetOrganizationDto> getAll() {
