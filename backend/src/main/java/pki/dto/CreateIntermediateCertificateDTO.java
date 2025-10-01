@@ -7,9 +7,5 @@ import java.util.Date;
 
 @Getter
 @Setter
-public class CreateIntermediateCertificateDTO {
-    private String issuerId;
-    private CreateCertificatePartyDTO subject;
-    private Date startDate;
-    private Date endDate;
+public class CreateIntermediateCertificateDTO extends CreateNonRootCertificateDTO {
 }

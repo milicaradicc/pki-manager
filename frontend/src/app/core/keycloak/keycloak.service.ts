@@ -124,4 +124,10 @@ export class KeycloakService {
     if (!this.keycloak) return '';
       return `${this.baseUrl}/realms/${this.realm}/account`;
   }
+
+  getUserOrganization(): string|undefined {
+    const token = this.keycloak?.tokenParsed;
+    if (!token) return '';
+    return token['organization'] || undefined;
+  }
 }

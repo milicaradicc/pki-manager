@@ -31,7 +31,7 @@
 
       <mat-form-field appearance="outline">
         <mat-label>Organization</mat-label>
-        <input matInput formControlName="organization">
+        <input matInput formControlName="organization" [readonly]="isCaUser">
       </mat-form-field>
 
       <mat-form-field appearance="outline">

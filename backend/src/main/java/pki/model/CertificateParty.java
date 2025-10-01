@@ -23,8 +23,6 @@ import java.security.PublicKey;
 public class CertificateParty {
     @Id
     private String id;
-    private PrivateKey privateKey;
-    private PublicKey publicKey;
     private String commonName;
     private String surname;
     private String givenName;

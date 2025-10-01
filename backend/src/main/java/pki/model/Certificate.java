@@ -1,19 +1,17 @@
 package pki.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.security.PublicKey;
+import java.util.Date;
 
 @Entity
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class Certificate {
     @Id
     private String serialNumber;
@@ -22,4 +20,18 @@ public class Certificate {
     @ManyToOne
     private CertificateParty issuer;
     private CertificateType type;
+    @ManyToOne
+    private Organization organization;
+
+    private PublicKey publicKey;
+    @Column(columnDefinition = "TEXT")
+    private String wrappedPrivateKey;
+    private String wrappedDek;
+
+    private Date startDate;
+    private Date endDate;
+
+//    private boolean revoked;
+//    private String revocationReason;
+//    private String revocationDate;
 }

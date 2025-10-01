@@ -32,8 +32,8 @@ public class User {
     @Column
     private String lastname;
 
-    @Column
-    private String organization;
+    @ManyToOne
+    private Organization organization;
 
     @ManyToMany(fetch = FetchType.EAGER)
     private List<Certificate> ownedCertificates;

@@ -7,21 +7,25 @@ import {CreateRootCertificateDTO} from '../models/create-root-certificate-dto.mo
 import {CreateCertificatePartyDTO} from '../models/create-certificate-party.model';
 import {MatSnackBar} from '@angular/material/snack-bar';
 import {Router} from '@angular/router';
+import { provideNativeDateAdapter } from '@angular/material/core';
+import { MatSelectModule } from '@angular/material/select';
 
 @Component({
   selector: 'app-create-root',
   imports: [
-    MatFormField,
-    MatInput,
-    ReactiveFormsModule,
-    MatDatepickerToggle,
     MatDatepicker,
     MatDatepickerInput,
-    MatLabel
+    MatDatepickerToggle,
+    MatFormField,
+    MatInput,
+    MatLabel,
+    ReactiveFormsModule,
+    MatSelectModule,
   ],
   templateUrl: './create-root.component.html',
   standalone: true,
-  styleUrl: './create-root.component.css'
+  styleUrl: './create-root.component.css',
+  providers: [provideNativeDateAdapter()]
 })
 export class CreateRootComponent implements OnInit {
   createForm!: FormGroup;
@@ -36,8 +40,8 @@ export class CreateRootComponent implements OnInit {
   ngOnInit(): void {
     this.createForm = this.fb.group({
       commonName: ['', Validators.required],
-      surname: ['', Validators.required],
-      givenName: ['', Validators.required],
+      surname: [''],
+      givenName: [''],
       organization: ['', Validators.required],
       organizationalUnit: ['', Validators.required],
       country: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(2)]],
