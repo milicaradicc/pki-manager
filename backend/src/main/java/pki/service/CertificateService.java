@@ -177,7 +177,7 @@ public class CertificateService {
         }
     }
 
-    public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, CertificateException, KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, OperatorCreationException {
+    public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, GeneralSecurityException, OperatorCreationException {
         //TODO: add extensions
         //TODO: decide if this is only for end-entity users
         PemReader pemReader = new PemReader(new StringReader(csrContent));
@@ -187,6 +187,9 @@ public class CertificateService {
 
         CertificateParty issuer = certificatePartyRepository.findById(issuerId)
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + issuerId + " not found"));
+        Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuer);
+        if(issuerCertificate == null)
+            throw new IllegalArgumentException("Certificate of issuer with ID " + issuerId + " not found");
 
         if(!checkCertificateChainValidity(issuer, startDate, endDate))
             throw new IllegalArgumentException("Error validating certificate chain");
@@ -202,17 +205,34 @@ public class CertificateService {
         subject.setCountry(getRDNValue(csrSubject, BCStyle.C));
         subject.setEmail(getRDNValue(csrSubject, BCStyle.EmailAddress));
 
-        subject.setPublicKey((new JcaPKCS10CertificationRequest(csr)).getPublicKey());
-
         subject.setId(java.util.UUID.randomUUID().toString());
         subject = certificatePartyRepository.save(subject);
 
+        User user = userService.getLoggedUser();
         String serialNumber = UUID.randomUUID().toString().replace("-","");
-        X509Certificate x509certificate = generateCertificate(subject, issuer, startDate, endDate, serialNumber, false);
+
+        // TODO: add private key wrapping in case of auto generated key pair
+        Certificate certificate = Certificate.builder()
+                .serialNumber(serialNumber)
+                .subject(subject)
+                .issuer(issuer)
+                .type(CertificateType.END_ENTITY)
+                .publicKey((new JcaPKCS10CertificationRequest(csr)).getPublicKey())
+                .wrappedPrivateKey(null) // In case of user provided public key
+                .wrappedDek(null)
+                .startDate(startDate)
+                .endDate(endDate)
+                .organization(user.getOrganization())
+                .build();
+
+        String issuerWrappedKek = issuerCertificate.getOrganization() != null ? issuerCertificate.getOrganization().getWrappedKek() : adminWrappedKek;
+        PrivateKey issuerPrivateKey = keyService.unwrapPrivateKey(issuerCertificate.getWrappedPrivateKey(),
+                issuerCertificate.getWrappedDek(),
+                issuerWrappedKek);
+        X509Certificate x509certificate = generateCertificate(certificate, issuerPrivateKey, false);
 
         //TODO: sent certificate to user (it isn't saved in keystore)
 
-        Certificate certificate = new Certificate(serialNumber, subject, issuer, CertificateType.END_ENTITY);
         certificateRepository.save(certificate);
 
         keyStoreReader.downloadCertificate(x509certificate);

@@ -13,10 +13,7 @@ import pki.model.User;
 import pki.service.CertificateService;
 
 import java.io.IOException;
-import java.security.InvalidKeyException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
+import java.security.*;
 import java.security.cert.CertificateException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -31,21 +28,21 @@ public class CertificateController {
 
     @PreAuthorize("hasAuthority('ROLE_admin')")
     @PostMapping("/root")
-    public ResponseEntity<Void> issueRootCertificate(@RequestBody CreateRootCertificateDTO certificateDTO) throws ParseException, CertificateException, NoSuchAlgorithmException, NoSuchProviderException, OperatorCreationException, CertIOException {
+    public ResponseEntity<Void> issueRootCertificate(@RequestBody CreateRootCertificateDTO certificateDTO) throws ParseException, GeneralSecurityException, OperatorCreationException, CertIOException {
         certificateService.issueRootCertificate(certificateDTO);
         return ResponseEntity.ok( null );
     }
 
     @PreAuthorize("hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
     @PostMapping("/intermediate")
-    public ResponseEntity<Void> issueIntermediateCertificate(@RequestBody CreateIntermediateCertificateDTO certificateDTO) throws ParseException, CertificateException, NoSuchAlgorithmException, NoSuchProviderException, OperatorCreationException, IOException, KeyStoreException {
+    public ResponseEntity<Void> issueIntermediateCertificate(@RequestBody CreateIntermediateCertificateDTO certificateDTO) throws ParseException, GeneralSecurityException, OperatorCreationException, IOException {
         certificateService.issueIntermediateCertificate(certificateDTO);
         return ResponseEntity.ok( null );
     }
 
     @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
     @PostMapping("/end-entity")
-    public ResponseEntity<Void> issueEndEntityCertificate(@RequestBody CreateEndEntityCertificateDTO certificateDTO) throws ParseException, CertificateException, NoSuchAlgorithmException, NoSuchProviderException, OperatorCreationException, IOException, KeyStoreException {
+    public ResponseEntity<Void> issueEndEntityCertificate(@RequestBody CreateEndEntityCertificateDTO certificateDTO) throws ParseException, GeneralSecurityException, OperatorCreationException, IOException {
         certificateService.issueEndEntityCertificate(certificateDTO);
         return ResponseEntity.ok( null );
     }
@@ -57,7 +54,7 @@ public class CertificateController {
             @RequestParam("issuerId") String issuerId,
             @RequestParam("startDate") String startDate,
             @RequestParam("endDate") String endDate
-    ) throws IOException, ParseException, CertificateException, KeyStoreException, NoSuchAlgorithmException, NoSuchProviderException, InvalidKeyException, OperatorCreationException {
+    ) throws IOException, ParseException, GeneralSecurityException, OperatorCreationException {
         Date start = new SimpleDateFormat("yyyy-MM-dd").parse(startDate);
         Date end = new SimpleDateFormat("yyyy-MM-dd").parse(endDate);
         String csrContent = new String(csrFile.getBytes());
