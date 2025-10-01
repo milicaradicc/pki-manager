@@ -1,5 +1,6 @@
 package pki.controller;
 
+import lombok.RequiredArgsConstructor;
 import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,9 +25,9 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/certificates")
+@RequiredArgsConstructor
 public class CertificateController {
-    @Autowired
-    private CertificateService certificateService;
+    private final CertificateService certificateService;
 
     @PreAuthorize("hasAuthority('ROLE_admin')")
     @PostMapping("/root")

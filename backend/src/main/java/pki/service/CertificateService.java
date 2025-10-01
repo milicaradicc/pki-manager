@@ -1,5 +1,7 @@
 package pki.service;
 
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -47,24 +49,21 @@ import java.util.Objects;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class CertificateService {
-    private static String keyStorePassword = "password";
-    private static String keyStoreFilePath = "src/main/resources/static/certificates.jks";
-    @Autowired
-    private CertificateRepository certificateRepository;
-    @Autowired
-    private CertificatePartyRepository certificatePartyRepository;
-    @Autowired
-    private  KeyStoreReader keyStoreReader;
-    @Autowired
-    private KeyStoreWriter keyStoreWriter;
-    @Autowired
-    private UserService userService;
-    @Autowired
-    private UserRepository userRepository;
-    private ModelMapper modelMapper = new ModelMapper();
+    private static final String keyStorePassword = "password";
+    private static final String keyStoreFilePath = "src/main/resources/static/certificates.jks";
 
-    public CertificateService(){
+    private final CertificateRepository certificateRepository;
+    private final CertificatePartyRepository certificatePartyRepository;
+    private final KeyStoreReader keyStoreReader;
+    private final KeyStoreWriter keyStoreWriter;
+    private final UserService userService;
+    private final UserRepository userRepository;
+    private final ModelMapper modelMapper = new ModelMapper();
+
+    @PostConstruct
+    private void init() {
         Security.addProvider(new BouncyCastleProvider());
     }
 
@@ -133,7 +132,7 @@ public class CertificateService {
 
         CertificateParty subject = modelMapper.map(certificateDTO.getSubject(), CertificateParty.class);
         subject.setId(java.util.UUID.randomUUID().toString());
-        KeyPair keyPair = generateKeyPair();
+        KeyPair keyPair = KeyService.generateKeyPair();
         subject.setPrivateKey(keyPair.getPrivate());
         subject.setPublicKey(keyPair.getPublic());
         subject = certificatePartyRepository.save(subject);
@@ -201,13 +200,6 @@ public class CertificateService {
     private  String getRDNValue(X500Name name, ASN1ObjectIdentifier oid) {
         RDN rdn = name.getRDNs(oid).length > 0 ? name.getRDNs(oid)[0] : null;
         return rdn != null ? rdn.getFirst().getValue().toString() : null;
-    }
-
-    private KeyPair generateKeyPair() throws NoSuchAlgorithmException, NoSuchProviderException {
-        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-        SecureRandom random = SecureRandom.getInstance("SHA1PRNG", "SUN");
-        keyGen.initialize(2048, random);
-        return keyGen.generateKeyPair();
     }
 
     private X509Certificate generateCertificate(CertificateParty subject, CertificateParty issuer, Date startDate, Date endDate, String serialNumber, boolean isCa) throws CertificateException, OperatorCreationException, CertIOException {

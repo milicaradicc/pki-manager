@@ -9,6 +9,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.security.PublicKey;
+import java.util.Date;
+
 @Entity
 @Getter
 @Setter
@@ -22,4 +25,15 @@ public class Certificate {
     @ManyToOne
     private CertificateParty issuer;
     private CertificateType type;
+
+    private PublicKey publicKey;
+    private String wrappedPrivateKey;
+    private String wrappedDek;
+
+    private Date startDate;
+    private Date endDate;
+
+//    private boolean revoked;
+//    private String revocationReason;
+//    private String revocationDate;
 }
