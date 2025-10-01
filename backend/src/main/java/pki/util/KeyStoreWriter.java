@@ -19,9 +19,7 @@ public class KeyStoreWriter {
     public KeyStoreWriter() {
         try {
             keyStore = KeyStore.getInstance("JKS", "SUN");
-        } catch (KeyStoreException e) {
-            e.printStackTrace();
-        } catch (NoSuchProviderException e) {
+        } catch (KeyStoreException | NoSuchProviderException e) {
             e.printStackTrace();
         }
     }
@@ -36,13 +34,7 @@ public class KeyStoreWriter {
                 //Ako je cilj kreirati novi KeyStore poziva se i dalje load, pri cemu je prvi parametar null
                 keyStore.load(null, password);
             }
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (CertificateException e) {
-            e.printStackTrace();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (NoSuchAlgorithmException | CertificateException | IOException e) {
             e.printStackTrace();
         }
     }
@@ -50,15 +42,7 @@ public class KeyStoreWriter {
     public void saveKeyStore(String fileName, char[] password) {
         try {
             keyStore.store(new FileOutputStream(fileName), password);
-        } catch (KeyStoreException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (CertificateException e) {
-            e.printStackTrace();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
             e.printStackTrace();
         }
     }

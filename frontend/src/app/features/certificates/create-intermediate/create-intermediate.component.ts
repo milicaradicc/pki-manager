@@ -10,6 +10,8 @@ import {CreateCertificatePartyDTO} from '../models/create-certificate-party.mode
 import {MatSelectModule} from '@angular/material/select';
 import {GetCertificateDto} from '../models/get-certificate-dto.model';
 import {CreateIntermediateCertificateDTO} from '../models/create-intermediate-cetrificate-dto.model';
+import { KeycloakService } from '../../../core/keycloak/keycloak.service';
+import { provideNativeDateAdapter } from '@angular/material/core';
 
 
 @Component({
@@ -26,26 +28,33 @@ import {CreateIntermediateCertificateDTO} from '../models/create-intermediate-ce
   ],
   templateUrl:'./create-intermediate.component.html',
   standalone: true,
-  styleUrl: './create-intermediate.component.css'
+  styleUrl: './create-intermediate.component.css',
+  providers: [provideNativeDateAdapter()]
 })
 export class CreateIntermediateComponent implements OnInit {
   createForm!: FormGroup;
   today = new Date();
   snackBar:MatSnackBar = inject(MatSnackBar);
   allCertificates:GetCertificateDto[]=[];
+  organization:string|undefined;
+  isCaUser:boolean = false;
 
   constructor(private fb: FormBuilder,
               private certificateService: CertificateService,
-              private router:Router) {
+              private router:Router,
+              private keycloakService: KeycloakService) {
   }
 
   ngOnInit(): void {
+    this.isCaUser = this.keycloakService.isCA();
+    if (this.isCaUser)
+      this.organization = this.keycloakService.getUserOrganization();
     this.createForm = this.fb.group({
       issuer: ['', Validators.required],
       commonName: ['', Validators.required],
-      surname: ['', Validators.required],
-      givenName: ['', Validators.required],
-      organization: ['', Validators.required],
+      surname: [''],
+      givenName: [''],
+      organization: [this.organization ?? '', Validators.required],
       organizationalUnit: ['', Validators.required],
       country: ['', [Validators.required, Validators.minLength(2), Validators.maxLength(2)]],
       email: ['', [Validators.required, Validators.email]],
@@ -72,7 +81,7 @@ export class CreateIntermediateComponent implements OnInit {
           commonName: formValues.commonName,
           surname: formValues.surname,
           givenName: formValues.givenName,
-          organization: formValues.organization,
+          organization: this.organization ?? formValues.organization,
           organizationalUnit: formValues.organizationalUnit,
           country: formValues.country,
           email: formValues.email,

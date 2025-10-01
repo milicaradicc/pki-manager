@@ -52,6 +52,8 @@ import java.util.UUID;
 public class CertificateService {
     @Value("${app.admin-wrapped-kek}")
     private String adminWrappedKek;
+    @Value("${app.keystore-password}")
+    private String keystorePassword;
 
     private static final String keyStoreFilePath = "src/main/resources/static/certificates.jks";
 
@@ -95,12 +97,12 @@ public class CertificateService {
         X509Certificate x509certificate = generateCertificate(certificate, keyPair.getPrivate(), true);
 
         char[] password = keyService.unwrapDek(wrappedDek, adminWrappedKek).toCharArray();
-        keyStoreWriter.loadKeyStore(keyStoreFilePath,  password);
+        keyStoreWriter.loadKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
         keyStoreWriter.write(serialNumber, keyPair.getPrivate(), password , x509certificate);
-        keyStoreWriter.saveKeyStore(keyStoreFilePath,  password);
+        keyStoreWriter.saveKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
 
         certificateRepository.save(certificate);
-        keyStoreReader.downloadCertificate(x509certificate);
+//        keyStoreReader.downloadCertificate(x509certificate);
     }
 
     public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
@@ -124,6 +126,11 @@ public class CertificateService {
             throw new IllegalArgumentException("Error validating certificate chain");
 
         User user = userService.getLoggedUser();
+        if (userService.getPrimaryRole().equals("ca")) {
+            if(user.getOrganization() == null ||
+                    !user.getOrganization().getName().equalsIgnoreCase(certificateDTO.getSubject().getOrganization()))
+                throw new IllegalArgumentException("Invalid organization");
+        }
         KeyPair keyPair = KeyService.generateKeyPair();
         String wrappedKek;
         if (userService.getPrimaryRole().equals("admin"))
@@ -162,9 +169,9 @@ public class CertificateService {
         X509Certificate x509certificate = generateCertificate(certificate, issuerPrivateKey, intermediate);
 
         char[] password = keyService.unwrapDek(wrappedDek, wrappedKek).toCharArray();
-        keyStoreWriter.loadKeyStore(keyStoreFilePath,  password);
+        keyStoreWriter.loadKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
         keyStoreWriter.write(serialNumber, keyPair.getPrivate(), password , x509certificate);
-        keyStoreWriter.saveKeyStore(keyStoreFilePath,  password);
+        keyStoreWriter.saveKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
 
         certificateRepository.save(certificate);
 
@@ -235,7 +242,7 @@ public class CertificateService {
 
         certificateRepository.save(certificate);
 
-        keyStoreReader.downloadCertificate(x509certificate);
+//        keyStoreReader.downloadCertificate(x509certificate);
     }
 
     private  String getRDNValue(X500Name name, ASN1ObjectIdentifier oid) {
@@ -292,26 +299,26 @@ public class CertificateService {
         return certConverter.getCertificate(certHolder);
     }
 
-    private boolean checkCertificateChainValidity(CertificateParty issuer, Date startDate, Date endDate) throws GeneralSecurityException, IOException { {
-        Certificate certificate = certificateRepository.findFirstBySubject(issuer);
-        if(certificate == null)
+    private boolean checkCertificateChainValidity(CertificateParty toCheck, Date startDate, Date endDate) throws GeneralSecurityException, IOException { {
+        Certificate certificateToCheck = certificateRepository.findFirstBySubject(toCheck);
+        if(certificateToCheck == null)
+            return false;
+        Certificate issuerCertificate = certificateRepository.findFirstBySubject(certificateToCheck.getIssuer());
+        if(issuerCertificate == null)
             return false;
 
-        Organization organization = certificate.getOrganization();
-        String wrappedKek = organization != null ? organization.getWrappedKek() : adminWrappedKek;
-        String password = keyService.unwrapDek(certificate.getWrappedDek(), wrappedKek);
-        X509Certificate x509Certificate = (X509Certificate) keyStoreReader.readCertificate(keyStoreFilePath, password, certificate.getSerialNumber());
+        X509Certificate x509Certificate = (X509Certificate) keyStoreReader.readCertificate(keyStoreFilePath, keystorePassword, certificateToCheck.getSerialNumber());
         try {
-            x509Certificate.verify(certificate.getPublicKey());
+            x509Certificate.verify(issuerCertificate.getPublicKey());
         } catch (InvalidKeyException | SignatureException e) {
             return false;
         }
 
         if(x509Certificate.getNotBefore().before(startDate) && x509Certificate.getNotAfter().after(endDate))
-            if(certificate.getType()==CertificateType.ROOT)
+            if(certificateToCheck.getType()==CertificateType.ROOT)
                 return true;
             else
-                return checkCertificateChainValidity(certificate.getIssuer(), startDate, endDate);
+                return checkCertificateChainValidity(certificateToCheck.getIssuer(), startDate, endDate);
         return false;
         }
     }

@@ -24,6 +24,7 @@ public class Certificate {
     private Organization organization;
 
     private PublicKey publicKey;
+    @Column(columnDefinition = "TEXT")
     private String wrappedPrivateKey;
     private String wrappedDek;
 
