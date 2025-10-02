@@ -261,13 +261,16 @@ public class CertificateService {
     private X509Certificate generateCertificate(Certificate certificate, PrivateKey issuerPrivateKey, boolean isCa)
             throws CertificateException, OperatorCreationException, CertIOException {
 
-        JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
-        builder = builder.setProvider("BC");
+        JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption")
+                .setProvider("BC");
         ContentSigner contentSigner = builder.build(issuerPrivateKey);
 
+        X500Name issuerName = certificate.getIssuer().getX500Name();
+        BigInteger serial = new BigInteger(certificate.getSerialNumber(), 16);
+
         X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(
-                certificate.getIssuer().getX500Name(),
-                new BigInteger(certificate.getSerialNumber(), 16),
+                issuerName,
+                serial,
                 certificate.getStartDate(),
                 certificate.getEndDate(),
                 certificate.getSubject().getX500Name(),
@@ -290,7 +293,7 @@ public class CertificateService {
             certGen.addExtension(
                     Extension.basicConstraints,
                     true,
-                    new BasicConstraints(false) // not a CA
+                    new BasicConstraints(false)
             );
 
             certGen.addExtension(
@@ -300,7 +303,17 @@ public class CertificateService {
             );
         }
 
-        String crlDpUrl = getCrlDistributionPointUrl(certificate.getIssuer());
+        String crlDpUrl;
+        if (certificate.getType() == CertificateType.ROOT) {
+            crlDpUrl = crlUrl + "/" + certificate.getSerialNumber();
+        } else {
+            Certificate issuerCert = certificateRepository.findFirstBySubject(certificate.getIssuer());
+            if (issuerCert == null) {
+                throw new IllegalArgumentException("Issuer certificate not found for CRL DP");
+            }
+            crlDpUrl = crlUrl + "/" + issuerCert.getSerialNumber();
+        }
+
         DistributionPointName distPoint = new DistributionPointName(
                 new GeneralNames(new GeneralName(GeneralName.uniformResourceIdentifier, crlDpUrl))
         );
@@ -308,12 +321,11 @@ public class CertificateService {
         certGen.addExtension(Extension.cRLDistributionPoints, false, new CRLDistPoint(distPoints));
 
         X509CertificateHolder certHolder = certGen.build(contentSigner);
-
-        JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
-        certConverter = certConverter.setProvider("BC");
+        JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter().setProvider("BC");
 
         return certConverter.getCertificate(certHolder);
     }
+
 
     private boolean checkCertificateChainValidity(CertificateParty issuerParty, Date startDate, Date endDate)
             throws GeneralSecurityException, IOException {
@@ -545,19 +557,5 @@ public class CertificateService {
 
     public Certificate getCertificateBySerialNumber(String serialNumber) {
         return certificateRepository.findFirstBySerialNumber(serialNumber);
-    }
-
-    public List<Certificate> getAllCACertificates() {
-        return certificateRepository.findByTypeIn(
-                List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE)
-        );
-    }
-
-    private String getCrlDistributionPointUrl(CertificateParty issuerParty) {
-        Certificate issuerCert = certificateRepository.findFirstBySubject(issuerParty);
-        if (issuerCert == null) {
-            throw new IllegalArgumentException("Issuer certificate not found for CRL DP");
-        }
-        return crlUrl + "/" + issuerCert.getSerialNumber();
     }
 }
