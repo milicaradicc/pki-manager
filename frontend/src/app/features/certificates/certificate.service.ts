@@ -7,37 +7,50 @@ import {CreateIntermediateCertificateDTO} from './models/create-intermediate-cet
 import { environment } from '../../../environments/environment';
 import { AssignCertificateDTO } from './models/assign-certificate.dto';
 import { DownloadCertificateDTO } from './models/download-certificate.dto';
+import { CreateEndEntityCertificateDTO } from './models/create-end-entity-dto.model';
 
 @Injectable({
   providedIn: 'root'
 })
 export class CertificateService {
-  private baseUrl = environment.backend + 'certificates';
+  private baseUrl = `${environment.backend}certificates`;
 
   constructor(private http: HttpClient) {}
 
-  createRootCertificate(dto:CreateRootCertificateDTO): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/root`,dto);
+  createRootCertificate(dto: CreateRootCertificateDTO): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/root`, dto);
   }
 
-  createIntermediateCertificate(dto:CreateIntermediateCertificateDTO): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/intermediate`,dto);
+  createIntermediateCertificate(dto: CreateIntermediateCertificateDTO): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/intermediate`, dto);
   }
 
-  createEndEntityCertificate(dto:CreateIntermediateCertificateDTO): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/end-entity`,dto);
+  createEndEntityCertificate(dto: CreateEndEntityCertificateDTO): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/end-entity`, dto);
   }
 
-  sendCSR(formData:FormData): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/csr`,formData);
+  sendCSR(formData: FormData): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/csr`, formData);
   }
 
   getAllCaCertificates(): Observable<GetCertificateDto[]> {
     return this.http.get<GetCertificateDto[]>(`${this.baseUrl}/ca`);
   }
 
-  assignCertificate(dto:AssignCertificateDTO): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/assign-ca-user`,dto);
+  getAllCertificates(): Observable<GetCertificateDto[]> {
+    return this.http.get<GetCertificateDto[]>(this.baseUrl);
+  }
+
+  getOwnedCertificates(): Observable<GetCertificateDto[]> {
+    return this.http.get<GetCertificateDto[]>(`${this.baseUrl}/owned`);
+  }
+
+  assignCertificate(dto: AssignCertificateDTO): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/assign-ca-user`, dto);
+  }
+
+  revokeCertificate(serial: string, reason: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/${serial}/revoke`, { reason });
   }
 
   downloadCertificate(serialNumber:string): Observable<DownloadCertificateDTO> {

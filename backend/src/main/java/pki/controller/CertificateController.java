@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import pki.dto.*;
 import pki.dto.certificate.DownloadCertificateDTO;
+import pki.model.RevocationReason;
+import pki.model.User;
 import pki.service.CertificateService;
 import pki.service.ExportService;
 
@@ -76,6 +78,27 @@ public class CertificateController {
         certificateService.assignCaUser(assignCertificateDTO);
         return ResponseEntity.ok( null );
     }
+    @PreAuthorize("hasAuthority('ROLE_admin')")
+    @GetMapping
+    public ResponseEntity<List<GetCertificateDTO>> getAllCertificates() {
+        List<GetCertificateDTO> certificates = certificateService.getAllCertificates();
+        return ResponseEntity.ok(certificates);
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
+    @PostMapping("/{serial}/revoke")
+    public ResponseEntity<Void> revokeCertificate(@PathVariable String serial, @RequestBody RevokeReasonDTO dto) {
+        RevocationReason reason = RevocationReason.valueOf(dto.getREASON().toUpperCase());
+        certificateService.revokeCertificate(serial, reason);
+        return ResponseEntity.ok().build();
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
+    @GetMapping("/owned")
+    public ResponseEntity<List<GetCertificateDTO>> getOwnedCertificates() {
+        return ResponseEntity.ok(certificateService.getOwnedCertificates());
+    }
+
 
     @PreAuthorize("hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca') or hasAuthority('ROLE_user')")
     @GetMapping("/{serialNumber}/download")

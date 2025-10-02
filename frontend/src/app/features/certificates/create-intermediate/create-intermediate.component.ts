@@ -89,13 +89,15 @@ export class CreateIntermediateComponent implements OnInit {
         startDate: (new Date(formValues.startDate.getTime() - formValues.startDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0],
         endDate: (new Date(formValues.endDate.getTime() - formValues.endDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0],
       };
+      console.log(dto);
       this.certificateService.createIntermediateCertificate(dto).subscribe({
         next: (createdEvent) => {
           this.snackBar.open('Certificate created successfully','OK',{duration:3000});
           this.router.navigate(['home']);
         },
-        error: () => {
-          this.snackBar.open('Error creating certificate','OK',{duration:3000});
+        error: (err) => {
+          let errorMessage = err?.error || 'Unknown error';
+          this.snackBar.open(errorMessage, 'OK', { duration: 5000 });
         }
       });
     }
