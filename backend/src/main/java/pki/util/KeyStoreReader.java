@@ -23,14 +23,21 @@ public class KeyStoreReader {
     }
 
     public Certificate readCertificate(String keyStoreFile, String keyStorePass, String alias) throws KeyStoreException, NoSuchProviderException, IOException, CertificateException, NoSuchAlgorithmException {
-        KeyStore ks = KeyStore.getInstance("JKS", "SUN");
         BufferedInputStream in = new BufferedInputStream(new FileInputStream(keyStoreFile));
-        ks.load(in, keyStorePass.toCharArray());
+        keyStore.load(in, keyStorePass.toCharArray());
 
-        if(ks.isKeyEntry(alias)) {
-            Certificate cert = ks.getCertificate(alias);
+        if(keyStore.isKeyEntry(alias)) {
+            Certificate cert = keyStore.getCertificate(alias);
             return cert;
         }
+        return null;
+    }
+
+    public Certificate[] readCertificateChain(String keyStoreFile, String keyStorePass, String alias) throws KeyStoreException, NoSuchProviderException, IOException, CertificateException, NoSuchAlgorithmException {
+        BufferedInputStream in = new BufferedInputStream(new FileInputStream(keyStoreFile));
+        keyStore.load(in, keyStorePass.toCharArray());
+        if(keyStore.isKeyEntry(alias))
+            return keyStore.getCertificateChain(alias);
         return null;
     }
 

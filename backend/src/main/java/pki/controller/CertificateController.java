@@ -3,14 +3,14 @@ package pki.controller;
 import lombok.RequiredArgsConstructor;
 import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.operator.OperatorCreationException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import pki.dto.*;
-import pki.model.User;
+import pki.dto.certificate.DownloadCertificateDTO;
 import pki.service.CertificateService;
+import pki.service.ExportService;
 
 import java.io.IOException;
 import java.security.*;
@@ -25,6 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CertificateController {
     private final CertificateService certificateService;
+    private final ExportService exportService;
 
     @PreAuthorize("hasAuthority('ROLE_admin')")
     @PostMapping("/root")
@@ -74,5 +75,13 @@ public class CertificateController {
     public ResponseEntity<Void> assignCaUser(@RequestBody AssignCertificateDTO assignCertificateDTO) throws ParseException, CertificateException, NoSuchAlgorithmException, NoSuchProviderException, OperatorCreationException, CertIOException {
         certificateService.assignCaUser(assignCertificateDTO);
         return ResponseEntity.ok( null );
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca') or hasAuthority('ROLE_user')")
+    @GetMapping("/{serialNumber}/download")
+    public ResponseEntity<DownloadCertificateDTO> download(@PathVariable String serialNumber) throws IOException, GeneralSecurityException {
+        DownloadCertificateDTO result = exportService.exportCertificate(serialNumber);
+        return ResponseEntity.ok(result);
+//        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=certificate_" + serialNumber + ".cer").body(certificate);
     }
 }

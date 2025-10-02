@@ -21,7 +21,6 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequest;
 import org.bouncycastle.util.io.pem.PemReader;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pki.dto.*;
@@ -38,7 +37,6 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigInteger;
 import java.security.*;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -52,10 +50,10 @@ import java.util.UUID;
 public class CertificateService {
     @Value("${app.admin-wrapped-kek}")
     private String adminWrappedKek;
-    @Value("${app.keystore-password}")
+    @Value("${app.certificate-keystore-password}")
     private String keystorePassword;
-
-    private static final String keyStoreFilePath = "src/main/resources/static/certificates.jks";
+    @Value("${app.certificate-keystore-path}")
+    private String keyStoreFilePath;
 
     private final CertificateRepository certificateRepository;
     private final CertificatePartyRepository certificatePartyRepository;
@@ -299,7 +297,7 @@ public class CertificateService {
         return certConverter.getCertificate(certHolder);
     }
 
-    private boolean checkCertificateChainValidity(CertificateParty toCheck, Date startDate, Date endDate) throws GeneralSecurityException, IOException { {
+    boolean checkCertificateChainValidity(CertificateParty toCheck, Date startDate, Date endDate) throws GeneralSecurityException, IOException { {
         Certificate certificateToCheck = certificateRepository.findFirstBySubject(toCheck);
         if(certificateToCheck == null)
             return false;
@@ -356,5 +354,16 @@ public class CertificateService {
             return;
         user.getOwnedCertificates().add(certificate);
         userRepository.save(user);
+    }
+
+    public boolean checkCertificatePermission(Certificate certificate, List<Certificate> ownedCertificates) {
+        if(ownedCertificates.stream().anyMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
+            return true;
+        if (certificate.getType()==CertificateType.ROOT)
+            return false;
+        Certificate issuerCertificate = certificateRepository.findFirstBySubject(certificate.getIssuer());
+        if(issuerCertificate == null)
+            return false;
+        return checkCertificatePermission(issuerCertificate, ownedCertificates);
     }
 }
