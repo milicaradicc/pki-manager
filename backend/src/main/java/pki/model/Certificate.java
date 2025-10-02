@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.security.PublicKey;
 import java.util.Date;
+import java.util.Set;
 
 @Entity
 @Getter
@@ -34,4 +35,14 @@ public class Certificate {
     private Boolean usedAdminKek;
     @Column(name = "crl_distribution_point")
     private String crlDistributionPoint;
+
+    @ElementCollection(targetClass = KeyUsageModel.class, fetch = FetchType.EAGER)
+    @CollectionTable(name = "certificate_key_usages", joinColumns = @JoinColumn(name = "certificate_serial"))
+    @Enumerated(EnumType.STRING)
+    private Set<KeyUsageModel> keyUsages;
+
+    @ElementCollection(targetClass = ExtendedKeyUsageModel.class, fetch = FetchType.EAGER)
+    @CollectionTable(name = "certificate_extended_key_usages", joinColumns = @JoinColumn(name = "certificate_serial"))
+    @Enumerated(EnumType.STRING)
+    private Set<ExtendedKeyUsageModel> extendedKeyUsages;
 }
