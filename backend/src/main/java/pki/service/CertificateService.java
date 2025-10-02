@@ -150,6 +150,14 @@ public class CertificateService {
 
         String serialNumber = UUID.randomUUID().toString().replace("-","");
 
+        HashSet<ExtendedKeyUsageModel> extendedKeyUsages = resolveExtendedKeyUsages(certificateDTO, issuerCertificate);
+        HashSet<KeyUsageModel> keyUsages = new HashSet<>();
+        if(!intermediate && certificateDTO instanceof CreateEndEntityCertificateDTO endEntityDTO){
+            if(endEntityDTO.getKeyUsages() != null && !endEntityDTO.getKeyUsages().isEmpty()){
+                keyUsages.addAll(endEntityDTO.getKeyUsages());
+            }
+        }
+
         Certificate certificate = Certificate.builder()
                 .serialNumber(serialNumber)
                 .subject(subject)
@@ -162,6 +170,8 @@ public class CertificateService {
                 .endDate(certificateDTO.getEndDate())
                 .organization(user.getOrganization())
                 .usedAdminKek(userService.getPrimaryRole().equals("admin"))
+                .extendedKeyUsages(extendedKeyUsages)
+                .keyUsages(keyUsages)
                 .build();
 
         String issuerWrappedKek = (issuerCertificate.getUsedAdminKek() != null && issuerCertificate.getUsedAdminKek())
@@ -186,7 +196,35 @@ public class CertificateService {
             user.getOwnedCertificates().add(certificate);
             userRepository.save(user);
         }
+
+        keyStoreReader.downloadCertificate(x509certificate);
     }
+
+    private HashSet<ExtendedKeyUsageModel> resolveExtendedKeyUsages(CreateNonRootCertificateDTO certificateDTO, Certificate issuerCertificate){
+        HashSet<ExtendedKeyUsageModel> extendedKeyUsages = new HashSet<>();
+
+        if(issuerCertificate.getExtendedKeyUsages()!=null && !issuerCertificate.getExtendedKeyUsages().isEmpty()){
+            if(certificateDTO.getExtendedKeyUsages() == null || certificateDTO.getExtendedKeyUsages().isEmpty())
+                extendedKeyUsages.addAll(issuerCertificate.getExtendedKeyUsages());
+            else{
+                checkExtendedKeyUsage(issuerCertificate.getExtendedKeyUsages(), certificateDTO.getExtendedKeyUsages());
+                extendedKeyUsages.addAll(certificateDTO.getExtendedKeyUsages());
+            }
+        }
+        else{
+            extendedKeyUsages.addAll(certificateDTO.getExtendedKeyUsages());
+        }
+
+        return extendedKeyUsages;
+    }
+
+    private void checkExtendedKeyUsage(Collection<ExtendedKeyUsageModel> parentUsages, Collection<ExtendedKeyUsageModel> childUsages){
+        for(ExtendedKeyUsageModel usage : childUsages){
+            if(!parentUsages.contains(usage))
+                throw new IllegalArgumentException("Given extended key usage is not allowed by issuer: ");
+        }
+    }
+
 
     public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, GeneralSecurityException, OperatorCreationException {
         //TODO: add extensions
@@ -295,13 +333,32 @@ public class CertificateService {
                     true,
                     new BasicConstraints(false)
             );
+        }
 
+        if(certificate.getKeyUsages() != null && !certificate.getKeyUsages().isEmpty()){
+            int keyUsageBits = 0;
+            for(KeyUsageModel usage : certificate.getKeyUsages()){
+                keyUsageBits |= mapKeyUsage(usage);
+            }
             certGen.addExtension(
                     Extension.keyUsage,
                     true,
-                    new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment)
+                    new KeyUsage(keyUsageBits)
             );
         }
+
+        if (certificate.getExtendedKeyUsages() != null && !certificate.getExtendedKeyUsages().isEmpty()) {
+            List<KeyPurposeId> usages = new ArrayList<>();
+            for (ExtendedKeyUsageModel usage : certificate.getExtendedKeyUsages()) {
+                usages.add(mapExtendedKeyUsage(usage));
+            }
+            certGen.addExtension(
+                    Extension.extendedKeyUsage,
+                    false,
+                    new ExtendedKeyUsage(usages.toArray(new KeyPurposeId[0]))
+            );
+        }
+
 
         String crlDpUrl;
         if (certificate.getType() == CertificateType.ROOT) {
@@ -325,6 +382,32 @@ public class CertificateService {
 
         return certConverter.getCertificate(certHolder);
     }
+
+    public int mapKeyUsage(KeyUsageModel model){
+        return switch (model) {
+            case DIGITAL_SIGNATURE -> KeyUsage.digitalSignature;
+            case NON_REPUDIATION -> KeyUsage.nonRepudiation;
+            case KEY_ENCIPHERMENT -> KeyUsage.keyEncipherment;
+            case DATA_ENCIPHERMENT -> KeyUsage.dataEncipherment;
+            case KEY_AGREEMENT -> KeyUsage.keyAgreement;
+            case KEY_CERT_SIGN -> KeyUsage.keyCertSign;
+            case CRL_SIGN -> KeyUsage.cRLSign;
+        };
+    }
+
+    public KeyPurposeId mapExtendedKeyUsage(ExtendedKeyUsageModel model){
+        return switch (model) {
+            case SERVER_AUTH -> KeyPurposeId.id_kp_serverAuth;
+            case CLIENT_AUTH -> KeyPurposeId.id_kp_clientAuth;
+            case CODE_SIGNING -> KeyPurposeId.id_kp_codeSigning;
+            case EMAIL_PROTECTION -> KeyPurposeId.id_kp_emailProtection;
+            case TIME_STAMPING -> KeyPurposeId.id_kp_timeStamping;
+            case OCSP_SIGNING -> KeyPurposeId.id_kp_OCSPSigning;
+        };
+    }
+
+
+
 
 
     private boolean checkCertificateChainValidity(CertificateParty issuerParty, Date startDate, Date endDate)
