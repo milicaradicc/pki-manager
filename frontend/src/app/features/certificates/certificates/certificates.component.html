@@ -28,7 +28,7 @@
 
   <div class="section">
     <div class="section-header">
-      <h2>Certificates ({{ certificates.length }})</h2>
+      <h2>Certificate Hierarchy ({{ certificates.length }})</h2>
     </div>
 
     <div *ngIf="certificates.length === 0 && !loading" class="no-certificates">
@@ -39,11 +39,11 @@
       <table class="certificates-table">
         <thead>
           <tr>
+            <th style="width: 40px;"></th>
             <th>Serial Number</th>
             <th>Type</th>
             <th>Subject</th>
             <th>Organization</th>
-            <th>Issuer</th>
             <th>Valid From</th>
             <th>Valid To</th>
             <th>Status</th>
@@ -51,73 +51,90 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let cert of certificates" class="cert-row">
-            <td class="serial-number" [title]="cert.serialNumber">
-              {{ cert.serialNumber | slice:0:12 }}...
+          <tr *ngFor="let node of flattenedTree" 
+              class="cert-row"
+              [class.revoked-parent]="node.hasRevokedParent">
+            <td class="expand-cell">
+              <button 
+                *ngIf="node.children.length > 0"
+                class="expand-btn"
+                (click)="toggleExpand(node)"
+                [style.margin-left.px]="node.level * 20">
+                {{ node.expanded ? '▼' : '▶' }}
+              </button>
+              <span *ngIf="node.children.length === 0" 
+                    [style.margin-left.px]="node.level * 20 + 20">
+              </span>
+            </td>
+            <td class="serial-number" [title]="node.certificate.serialNumber">
+              <span [style.margin-left.px]="node.children.length === 0 ? 0 : 0">
+                {{ node.certificate.serialNumber | slice:0:12 }}...
+              </span>
             </td>
             <td>
               <span 
                 class="type-badge" 
                 [ngClass]="{
-                  'type-root': cert.type === 'ROOT',
-                  'type-intermediate': cert.type === 'INTERMEDIATE',
-                  'type-end-entity': cert.type === 'END_ENTITY'
+                  'type-root': node.certificate.type === 'ROOT',
+                  'type-intermediate': node.certificate.type === 'INTERMEDIATE',
+                  'type-end-entity': node.certificate.type === 'END_ENTITY'
                 }">
-                {{ cert.type }}
+                {{ node.certificate.type }}
               </span>
             </td>
             <td class="subject-info">
-              <div class="primary-text">{{ cert.subjectCommonName || '-' }}</div>
-              <div class="secondary-text" *ngIf="cert.subjectEmail">
-                {{ cert.subjectEmail }}
+              <div class="primary-text">{{ node.certificate.subjectCommonName || '-' }}</div>
+              <div class="secondary-text" *ngIf="node.certificate.subjectEmail">
+                {{ node.certificate.subjectEmail }}
               </div>
-              <div class="secondary-text" *ngIf="cert.subjectGivenName || cert.subjectSurname">
-                {{ cert.subjectGivenName }} {{ cert.subjectSurname }}
+              <div class="secondary-text" *ngIf="node.certificate.subjectGivenName || node.certificate.subjectSurname">
+                {{ node.certificate.subjectGivenName }} {{ node.certificate.subjectSurname }}
               </div>
             </td>
             <td>
-              <div class="primary-text">{{ cert.subjectOrganization || '-' }}</div>
-              <div class="secondary-text" *ngIf="cert.subjectOrganizationalUnit">
-                {{ cert.subjectOrganizationalUnit }}
+              <div class="primary-text">{{ node.certificate.subjectOrganization || '-' }}</div>
+              <div class="secondary-text" *ngIf="node.certificate.subjectOrganizationalUnit">
+                {{ node.certificate.subjectOrganizationalUnit }}
               </div>
-              <div class="secondary-text" *ngIf="cert.subjectCountry">
-                {{ cert.subjectCountry }}
-              </div>
-            </td>
-            <td class="issuer-info">
-              <div class="primary-text">{{ cert.issuerCommonName || '-' }}</div>
-              <div class="secondary-text" *ngIf="cert.issuerOrganization">
-                {{ cert.issuerOrganization }}
+              <div class="secondary-text" *ngIf="node.certificate.subjectCountry">
+                {{ node.certificate.subjectCountry }}
               </div>
             </td>
-            <td>{{ cert.validFrom | date:'dd.MM.yyyy HH:mm' }}</td>
-            <td>{{ cert.validTo | date:'dd.MM.yyyy HH:mm' }}</td>
+            <td>{{ node.certificate.validFrom | date:'dd.MM.yyyy HH:mm' }}</td>
+            <td>{{ node.certificate.validTo | date:'dd.MM.yyyy HH:mm' }}</td>
             <td>
-                <span [class]="getStatusClass(cert)">
-                    {{ getStatus(cert) }}
-                </span>
+              <span [class]="getStatusClass(node.certificate)">
+                {{ getStatus(node.certificate) }}
+              </span>
             </td>
             <td class="actions">
               <button 
+                class="btn btn-success btn-sm" 
+                (click)="createCertificate(node.certificate.serialNumber)"
+                [disabled]="!canCreateCertificate(node) || loading"
+                [title]="canCreateCertificate(node) ? 'Create Certificate' : 'Cannot create - parent revoked or expired'">
+                Create
+              </button>
+              <button 
                 class="btn btn-primary btn-sm" 
-                (click)="viewDetails(cert)"
+                (click)="viewDetails(node.certificate)"
                 [disabled]="loading"
                 title="View Details">
                 Details
               </button>
               <button 
                 class="btn btn-secondary btn-sm" 
-                (click)="download(cert.serialNumber)"
+                (click)="download(node.certificate.serialNumber)"
                 [disabled]="loading"
                 title="Download Certificate">
                 Download
               </button>
               <button 
-                (click)="revoke(cert.serialNumber)" 
-                [disabled]="cert.revoked"
-                class="btn btn-danger btn-sm" >
-                {{ cert.revoked ? 'Already Revoked' : 'Revoke' }}
-                </button>
+                (click)="revoke(node.certificate.serialNumber)" 
+                [disabled]="node.certificate.revoked || loading"
+                class="btn btn-danger btn-sm">
+                {{ node.certificate.revoked ? 'Revoked' : 'Revoke' }}
+              </button>
             </td>
           </tr>
         </tbody>
@@ -251,7 +268,7 @@
       </div>
       <div class="modal-body">
         <div class="revocation-warning">
-          <strong>Warning:</strong> This action cannot be undone. Please select a revocation reason.
+          <strong>Warning:</strong> This action cannot be undone. Revoking this certificate will also disable the ability to create new certificates from it. Please select a revocation reason.
         </div>
         
         <div class="form-group">

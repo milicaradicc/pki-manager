@@ -83,10 +83,18 @@ public class CertificateController {
         return ResponseEntity.ok(certificates);
     }
 
+    @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
     @PostMapping("/{serial}/revoke")
     public ResponseEntity<Void> revokeCertificate(@PathVariable String serial, @RequestBody RevokeReasonDTO dto) {
         RevocationReason reason = RevocationReason.valueOf(dto.getREASON().toUpperCase());
         certificateService.revokeCertificate(serial, reason);
         return ResponseEntity.ok().build();
     }
+
+    @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
+    @GetMapping("/owned")
+    public ResponseEntity<List<GetCertificateDTO>> getOwnedCertificates() {
+        return ResponseEntity.ok(certificateService.getOwnedCertificates());
+    }
+
 }

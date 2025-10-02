@@ -38,11 +38,7 @@ import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -495,6 +491,26 @@ public class CertificateService {
         }
 
         return keyService.unwrapPrivateKey(wrappedPrivateKey, wrappedDek, wrappedKek);
+    }
+
+    public List<GetCertificateDTO> getOwnedCertificates() {
+        User loggedUser = userService.getLoggedUser();
+
+        List<Certificate> owned = loggedUser.getOwnedCertificates();
+
+        List<Certificate> issued = new ArrayList<>();
+        if (Objects.equals(userService.getPrimaryRole(), "ca")) {
+            issued = certificateRepository.findByIssuer_Organization(loggedUser.getOrganization());
+        }
+
+        // Spoji u set da izbegneš duplikate
+        Set<Certificate> all = new HashSet<>();
+        if (owned != null) all.addAll(owned);
+        if (issued != null) all.addAll(issued);
+
+        return all.stream()
+                .map(this::mapToGetCertificateDTO)
+                .toList();
     }
 
     private GetCertificateDTO mapToGetCertificateDTO(Certificate certificate) {
