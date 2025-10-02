@@ -63,6 +63,24 @@
         <mat-datepicker #picker2></mat-datepicker>
       </mat-form-field>
 
+      <mat-form-field appearance="fill" class="w-full mt-4">
+        <mat-label>Key Usages</mat-label>
+        <mat-select formControlName="keyUsages" multiple>
+          <mat-option *ngFor="let usage of keyUsageOptions" [value]="usage">
+            {{ usage }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="w-full mt-4">
+        <mat-label>Extended Key Usages</mat-label>
+        <mat-select formControlName="extendedKeyUsages" multiple>
+          <mat-option *ngFor="let usage of extendedKeyUsageOptions" [value]="usage">
+            {{ usage }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
       <button mat-flat-button color="primary" class="submit-btn"
               (click)="save()"
               [disabled]="!createForm.valid">
