@@ -32,15 +32,6 @@ public class RevocationService {
             crlBuilder.addCRLEntry(new BigInteger(rc.getSerialNumber(), 16), rc.getRevokedAt(), reasonCode);
         }
 
-
-        // for (RevokedCertificate rc : revokedCertificates) {
-        //     BigInteger serial = new BigInteger(rc.getSerialNumber(), 16);
-        //     Date revokedAt = rc.getRevokedAt();
-        //     int reasonCode = rc.getReasonCode().ordinal(); // integer kod razloga
-        //
-        //     crlBuilder.addCRLEntry(serial, revokedAt, reasonCode); // int kod
-        // }
-
         ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSAEncryption").build(issuerPrivateKey);
         return new JcaX509CRLConverter().getCRL(crlBuilder.build(signer));
     }

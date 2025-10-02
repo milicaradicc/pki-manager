@@ -12,6 +12,7 @@ import java.util.Date;
 @AllArgsConstructor
 public class GetCertificateDTO {
     private String serialNumber;
+    private String subjectId;
 
     // CertificateParty subject
     private String subjectCommonName;

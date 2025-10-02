@@ -2,10 +2,7 @@ package pki.util;
 
 import org.springframework.stereotype.Component;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Path;
 import java.security.*;
 import java.security.cert.Certificate;
@@ -26,12 +23,12 @@ public class KeyStoreWriter {
 
     public void loadKeyStore(String fileName, char[] password) {
         Path path = Path.of(fileName);
-        fileName = path.toFile().exists() ? fileName : null;
+        File file = path.toFile();
+
         try {
-            if(fileName != null) {
+            if(file.exists() && file.length() > 0) {
                 keyStore.load(new FileInputStream(fileName), password);
             } else {
-                //Ako je cilj kreirati novi KeyStore poziva se i dalje load, pri cemu je prvi parametar null
                 keyStore.load(null, password);
             }
         } catch (NoSuchAlgorithmException | CertificateException | IOException e) {

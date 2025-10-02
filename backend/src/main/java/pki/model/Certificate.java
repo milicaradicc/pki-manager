@@ -30,4 +30,6 @@ public class Certificate {
 
     private Date startDate;
     private Date endDate;
+    @Column(name = "used_admin_kek")
+    private Boolean usedAdminKek;
 }

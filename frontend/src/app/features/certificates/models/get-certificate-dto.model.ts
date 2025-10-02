@@ -1,5 +1,6 @@
 export interface GetCertificateDto {
   serialNumber: string;
+  subjectId: string;
 
   // Subject
   subjectCommonName: string;

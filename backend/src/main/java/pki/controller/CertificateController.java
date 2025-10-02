@@ -84,16 +84,9 @@ public class CertificateController {
     }
 
     @PostMapping("/{serial}/revoke")
-    public ResponseEntity<Void> revokeCertificate(
-            @PathVariable String serial,
-            @RequestBody RevokeReasonDTO dto
-    ) {
-        // Konvertuj string iz DTO u enum
+    public ResponseEntity<Void> revokeCertificate(@PathVariable String serial, @RequestBody RevokeReasonDTO dto) {
         RevocationReason reason = RevocationReason.valueOf(dto.getREASON().toUpperCase());
-
-        // Pozovi servis sa enumom (ako servis prima enum)
         certificateService.revokeCertificate(serial, reason);
-
         return ResponseEntity.ok().build();
     }
 }

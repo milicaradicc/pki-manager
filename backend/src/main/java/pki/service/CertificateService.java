@@ -91,6 +91,7 @@ public class CertificateService {
                 .wrappedDek(wrappedDek)
                 .startDate(certificateDTO.getStartDate())
                 .endDate(certificateDTO.getEndDate())
+                .usedAdminKek(true)
                 .build();
 
         X509Certificate x509certificate = generateCertificate(certificate, keyPair.getPrivate(), true);
@@ -115,7 +116,10 @@ public class CertificateService {
     private void issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
-        checkRevocation(issuer);
+
+        // VAŽNO: Prvo proverite ceo lanac povlačenja
+        checkCertificateChainRevocation(issuer);
+
         Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuer);
         if(issuerCertificate == null)
             throw new IllegalArgumentException("Certificate of issuer with ID " + certificateDTO.getIssuerId() + " not found");
@@ -160,9 +164,12 @@ public class CertificateService {
                 .startDate(certificateDTO.getStartDate())
                 .endDate(certificateDTO.getEndDate())
                 .organization(user.getOrganization())
+                .usedAdminKek(userService.getPrimaryRole().equals("admin"))
                 .build();
 
-        String issuerWrappedKek = issuerCertificate.getOrganization() != null ? issuerCertificate.getOrganization().getWrappedKek() : adminWrappedKek;
+        String issuerWrappedKek = (issuerCertificate.getUsedAdminKek() != null && issuerCertificate.getUsedAdminKek())
+                ? adminWrappedKek
+                : issuerCertificate.getOrganization().getWrappedKek();
         PrivateKey issuerPrivateKey = keyService.unwrapPrivateKey(issuerCertificate.getWrappedPrivateKey(),
                 issuerCertificate.getWrappedDek(),
                 issuerWrappedKek);
@@ -194,6 +201,10 @@ public class CertificateService {
 
         CertificateParty issuer = certificatePartyRepository.findById(issuerId)
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + issuerId + " not found"));
+
+        // VAŽNO: Proveri lanac povlačenja i ovde
+        checkCertificateChainRevocation(issuer);
+
         Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuer);
         if(issuerCertificate == null)
             throw new IllegalArgumentException("Certificate of issuer with ID " + issuerId + " not found");
@@ -230,9 +241,12 @@ public class CertificateService {
                 .startDate(startDate)
                 .endDate(endDate)
                 .organization(user.getOrganization())
+                .usedAdminKek(userService.getPrimaryRole().equals("admin"))
                 .build();
 
-        String issuerWrappedKek = issuerCertificate.getOrganization() != null ? issuerCertificate.getOrganization().getWrappedKek() : adminWrappedKek;
+        String issuerWrappedKek = (issuerCertificate.getUsedAdminKek() != null && issuerCertificate.getUsedAdminKek())
+                ? adminWrappedKek
+                : issuerCertificate.getOrganization().getWrappedKek();
         PrivateKey issuerPrivateKey = keyService.unwrapPrivateKey(issuerCertificate.getWrappedPrivateKey(),
                 issuerCertificate.getWrappedDek(),
                 issuerWrappedKek);
@@ -245,7 +259,7 @@ public class CertificateService {
 //        keyStoreReader.downloadCertificate(x509certificate);
     }
 
-    private  String getRDNValue(X500Name name, ASN1ObjectIdentifier oid) {
+    private String getRDNValue(X500Name name, ASN1ObjectIdentifier oid) {
         RDN rdn = name.getRDNs(oid).length > 0 ? name.getRDNs(oid)[0] : null;
         return rdn != null ? rdn.getFirst().getValue().toString() : null;
     }
@@ -291,10 +305,12 @@ public class CertificateService {
                     new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment)
             );
 
-            // crl distribution point
+            // CRL Distribution Point URL (http://localhost:8080/crl/download)
+            // klijenti koji validiraju sertifikat mogu dohvatiti CRL i
+            // proveriti da li je sertifikat povučen
             DistributionPointName distPoint = new DistributionPointName(
                     new GeneralNames(
-                            new GeneralName(GeneralName.uniformResourceIdentifier, "http://localhost:8080/crl/download")
+                            new GeneralName(GeneralName.uniformResourceIdentifier, "https://localhost:8443/crl/download")
                     )
             );
             DistributionPoint[] distPoints = new DistributionPoint[]{new DistributionPoint(distPoint, null, null)};
@@ -309,27 +325,73 @@ public class CertificateService {
         return certConverter.getCertificate(certHolder);
     }
 
-    private boolean checkCertificateChainValidity(CertificateParty toCheck, Date startDate, Date endDate) throws GeneralSecurityException, IOException { {
-        Certificate certificateToCheck = certificateRepository.findFirstBySubject(toCheck);
-        if(certificateToCheck == null)
-            return false;
-        Certificate issuerCertificate = certificateRepository.findFirstBySubject(certificateToCheck.getIssuer());
+    private boolean checkCertificateChainValidity(CertificateParty issuerParty, Date startDate, Date endDate)
+            throws GeneralSecurityException, IOException {
+
+        Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuerParty);
         if(issuerCertificate == null)
             return false;
 
-        X509Certificate x509Certificate = (X509Certificate) keyStoreReader.readCertificate(keyStoreFilePath, keystorePassword, certificateToCheck.getSerialNumber());
+        // Učitaj issuer sertifikat iz keystore-a
+        X509Certificate x509IssuerCert = (X509Certificate) keyStoreReader.readCertificate(
+                keyStoreFilePath, keystorePassword, issuerCertificate.getSerialNumber()
+        );
+
+        if(x509IssuerCert == null)
+            return false;
+
+        // Proveri da li su datumi validni u odnosu na issuer sertifikat
+        if(x509IssuerCert.getNotBefore().after(startDate) || x509IssuerCert.getNotAfter().before(endDate))
+            return false;
+
+        // Ako je ROOT, verifikacija je završena
+        if(issuerCertificate.getType() == CertificateType.ROOT) {
+            return true;
+        }
+
+        // Ako nije ROOT, proveri issuer-a od issuer-a rekurzivno
+        Certificate issuerOfIssuer = certificateRepository.findFirstBySubject(issuerCertificate.getIssuer());
+        if(issuerOfIssuer == null)
+            return false;
+
+        // Verifikuj potpis
         try {
-            x509Certificate.verify(issuerCertificate.getPublicKey());
+            x509IssuerCert.verify(issuerOfIssuer.getPublicKey());
         } catch (InvalidKeyException | SignatureException e) {
             return false;
         }
 
-        if(x509Certificate.getNotBefore().before(startDate) && x509Certificate.getNotAfter().after(endDate))
-            if(certificateToCheck.getType()==CertificateType.ROOT)
-                return true;
-            else
-                return checkCertificateChainValidity(certificateToCheck.getIssuer(), startDate, endDate);
-        return false;
+        // Rekurzivno proveri lanac
+        return checkCertificateChainValidity(issuerCertificate.getIssuer(), startDate, endDate);
+    }
+
+    /**
+     * Proverava da li je bilo koji sertifikat u lancu povučen
+     * @param issuerParty Issuer od koga počinjemo proveru
+     * @throws IllegalArgumentException ako je bilo koji sertifikat u lancu povučen
+     */
+    private void checkCertificateChainRevocation(CertificateParty issuerParty) {
+        Certificate currentCertificate = certificateRepository.findFirstBySubject(issuerParty);
+
+        while (currentCertificate != null) {
+            boolean isRevoked = revokedCertificateRepository.existsBySerialNumber(
+                    currentCertificate.getSerialNumber()
+            );
+
+            if (isRevoked) {
+                throw new IllegalArgumentException(
+                        "Certificate with serial number " + currentCertificate.getSerialNumber() +
+                                " (CN=" + currentCertificate.getSubject().getCommonName() + ") in the chain is revoked"
+                );
+            }
+
+            if (currentCertificate.getType() == CertificateType.ROOT) {
+                break;
+            }
+
+            currentCertificate = certificateRepository.findFirstBySubject(
+                    currentCertificate.getIssuer()
+            );
         }
     }
 
@@ -410,7 +472,6 @@ public class CertificateService {
         }
     }
 
-
     public Certificate getRootCertificate() {
         return certificateRepository.findFirstByType(CertificateType.ROOT);
     }
@@ -422,7 +483,16 @@ public class CertificateService {
 
         String wrappedDek = certificate.getWrappedDek();
         String wrappedPrivateKey = certificate.getWrappedPrivateKey();
-        String wrappedKek = certificate.getOrganization() != null ? certificate.getOrganization().getWrappedKek() : adminWrappedKek;
+
+        String wrappedKek;
+        if (certificate.getUsedAdminKek() != null && certificate.getUsedAdminKek()) {
+            wrappedKek = adminWrappedKek;
+        } else if (certificate.getOrganization() != null) {
+            wrappedKek = certificate.getOrganization().getWrappedKek();
+        } else {
+            throw new IllegalArgumentException("Cannot determine KEK for certificate: " +
+                    certificate.getSerialNumber());
+        }
 
         return keyService.unwrapPrivateKey(wrappedPrivateKey, wrappedDek, wrappedKek);
     }
@@ -441,6 +511,7 @@ public class CertificateService {
 
         return new GetCertificateDTO(
                 certificate.getSerialNumber(),
+                certificate.getSubject().getId(),
 
                 // Subject fields
                 subject != null ? subject.getCommonName() : null,
@@ -464,15 +535,7 @@ public class CertificateService {
                 org != null ? org.getName() : null,
                 certificate.getStartDate(),
                 certificate.getEndDate(),
-                revoked 
+                revoked
         );
-    }
-
-    private void checkRevocation(CertificateParty issuer) {
-        boolean revoked = revokedCertificateRepository.existsBySerialNumber(
-                certificateRepository.findFirstBySubject(issuer).getSerialNumber()
-        );
-        if(revoked)
-            throw new IllegalArgumentException("Issuer certificate is revoked");
     }
 }

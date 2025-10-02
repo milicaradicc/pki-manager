@@ -72,8 +72,9 @@ export class CreateRootComponent implements OnInit {
           this.snackBar.open('Certificate created successfully','OK',{duration:3000});
           this.router.navigate(['home']);
         },
-        error: () => {
-          this.snackBar.open('Error creating certificate','OK',{duration:3000});
+        error: (err) => {
+          let errorMessage = err?.error || 'Unknown error';
+          this.snackBar.open(errorMessage, 'OK', { duration: 5000 });
         }
       });
     }
