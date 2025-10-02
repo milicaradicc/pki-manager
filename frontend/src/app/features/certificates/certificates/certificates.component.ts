@@ -25,14 +25,14 @@ export class CertificatesComponent implements OnInit {
   showRevocationPopup = false;
   revokingCertificateSerial: string | null = null;
   selectedReason: RevocationReason | null = null;
-  
+
   constructor(
     private certificateService: CertificateService,
     private keycloakService: KeycloakService
   ) {}
 
   ngOnInit(): void {
-    this.role = this.keycloakService.getUserRole(); 
+    this.role = this.keycloakService.getUserRole();
     this.loadCertificates();
   }
 
@@ -75,8 +75,9 @@ export class CertificatesComponent implements OnInit {
     this.showRevocationPopup = true;
   }
 
-  startRevocation(serial: string): void {
-    this.revokingCertificateSerial = serial;
+  cancelRevocation(): void {
+    this.showRevocationPopup = false;
+    this.revokingCertificateSerial = null;
     this.selectedReason = null;
   }
 
@@ -90,9 +91,10 @@ export class CertificatesComponent implements OnInit {
           next: () => {
             this.success = 'Certificate revoked successfully';
             this.loading = false;
+            this.showRevocationPopup = false;
             this.revokingCertificateSerial = null;
             this.selectedReason = null;
-            this.loadCertificates();
+            this.loadCertificates(); // refresh tabele
           },
           error: () => {
             this.error = 'Failed to revoke certificate';
@@ -102,10 +104,6 @@ export class CertificatesComponent implements OnInit {
     }
   }
 
-  cancelRevocation(): void {
-    this.revokingCertificateSerial = null;
-    this.selectedReason = null;
-  }
   viewDetails(cert: GetCertificateDto): void {
     this.selectedCertificate = cert;
   }
@@ -115,17 +113,40 @@ export class CertificatesComponent implements OnInit {
   }
 
   isValid(cert: GetCertificateDto): boolean {
+    if (cert.revoked) return false;  // Revoked certificates are not valid
     const now = new Date();
     const validFrom = new Date(cert.validFrom);
     const validTo = new Date(cert.validTo);
     return now >= validFrom && now <= validTo;
   }
 
+  getStatus(cert: GetCertificateDto): string {
+    if (cert.revoked) return 'Revoked';
+    const now = new Date();
+    const validFrom = new Date(cert.validFrom);
+    const validTo = new Date(cert.validTo);
+    
+    if (now < validFrom) return 'Not Yet Valid';
+    if (now > validTo) return 'Expired';
+    return 'Valid';
+  }
+
+  getStatusClass(cert: GetCertificateDto): string {
+    if (cert.revoked) return 'status-revoked';
+    const now = new Date();
+    const validFrom = new Date(cert.validFrom);
+    const validTo = new Date(cert.validTo);
+    
+    if (now < validFrom) return 'status-pending';
+    if (now > validTo) return 'status-expired';
+    return 'status-valid';
+  }
+
   clearMessages(): void {
     this.error = '';
     this.success = '';
   }
-  
+
   formatRevocationReason(reason: RevocationReason): string {
     return reason
       .replace(/_/g, ' ')

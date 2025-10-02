@@ -29,8 +29,17 @@ public class RevocationService {
         List<RevokedCertificate> revokedCertificates = revokedCertificateRepository.findAll();
         for (RevokedCertificate rc : revokedCertificates) {
             int reasonCode = rc.getReasonCode().ordinal();
-            crlBuilder.addCRLEntry(new BigInteger(rc.getSerialNumber(), 16), rc.getRevokedAt(), rc.getReasonCode().toBouncyCastleCRLReason());
+            crlBuilder.addCRLEntry(new BigInteger(rc.getSerialNumber(), 16), rc.getRevokedAt(), reasonCode);
         }
+
+
+        // for (RevokedCertificate rc : revokedCertificates) {
+        //     BigInteger serial = new BigInteger(rc.getSerialNumber(), 16);
+        //     Date revokedAt = rc.getRevokedAt();
+        //     int reasonCode = rc.getReasonCode().ordinal(); // integer kod razloga
+        //
+        //     crlBuilder.addCRLEntry(serial, revokedAt, reasonCode); // int kod
+        // }
 
         ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSAEncryption").build(issuerPrivateKey);
         return new JcaX509CRLConverter().getCRL(crlBuilder.build(signer));

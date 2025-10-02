@@ -93,11 +93,9 @@
             <td>{{ cert.validFrom | date:'dd.MM.yyyy HH:mm' }}</td>
             <td>{{ cert.validTo | date:'dd.MM.yyyy HH:mm' }}</td>
             <td>
-              <span 
-                class="status-badge" 
-                [ngClass]="isValid(cert) ? 'status-active' : 'status-inactive'">
-                {{ isValid(cert) ? 'Valid' : 'Expired' }}
-              </span>
+                <span [class]="getStatusClass(cert)">
+                    {{ getStatus(cert) }}
+                </span>
             </td>
             <td class="actions">
               <button 
@@ -115,13 +113,11 @@
                 Download
               </button>
               <button 
-                *ngIf="role === 'admin'" 
-                class="btn btn-danger btn-sm" 
-                (click)="revoke(cert.serialNumber)"
-                [disabled]="loading"
-                title="Revoke Certificate">
-                Revoke
-              </button>
+                (click)="revoke(cert.serialNumber)" 
+                [disabled]="cert.revoked"
+                class="btn btn-danger">
+                {{ cert.revoked ? 'Already Revoked' : 'Revoke' }}
+                </button>
             </td>
           </tr>
         </tbody>

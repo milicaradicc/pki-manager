@@ -25,4 +25,6 @@ export interface GetCertificateDto {
 
   validFrom: string;
   validTo: string;
+
+  revoked: boolean;  
 }

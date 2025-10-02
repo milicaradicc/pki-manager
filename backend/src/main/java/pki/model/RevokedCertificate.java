@@ -13,6 +13,7 @@ import java.util.Date;
 @Entity
 public class RevokedCertificate {
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
     private String serialNumber;
 

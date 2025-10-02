@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import pki.dto.*;
+import pki.model.RevocationReason;
 import pki.model.User;
 import pki.service.CertificateService;
 
@@ -82,4 +83,17 @@ public class CertificateController {
         return ResponseEntity.ok(certificates);
     }
 
+    @PostMapping("/{serial}/revoke")
+    public ResponseEntity<Void> revokeCertificate(
+            @PathVariable String serial,
+            @RequestBody RevokeReasonDTO dto
+    ) {
+        // Konvertuj string iz DTO u enum
+        RevocationReason reason = RevocationReason.valueOf(dto.getREASON().toUpperCase());
+
+        // Pozovi servis sa enumom (ako servis prima enum)
+        certificateService.revokeCertificate(serial, reason);
+
+        return ResponseEntity.ok().build();
+    }
 }

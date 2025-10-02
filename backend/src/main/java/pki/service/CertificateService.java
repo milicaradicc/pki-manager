@@ -61,6 +61,7 @@ public class CertificateService {
     private final KeyStoreWriter keyStoreWriter;
     private final UserService userService;
     private final UserRepository userRepository;
+    private final RevocationService revocationService;
     private final ModelMapper modelMapper = new ModelMapper();
     private final KeyService keyService;
 
@@ -384,20 +385,31 @@ public class CertificateService {
                 .toList();
     }
 
-    public void revokeCertificate(String serialNumber, String reason) {
+    public void revokeCertificate(String serialNumber, RevocationReason reason) {
         Certificate certificate = certificateRepository.findFirstBySerialNumber(serialNumber);
-        if(certificate == null) throw new IllegalArgumentException("Certificate not found");
-
-        RevocationReason rr = RevocationReason.valueOf(reason); // frontend šalje npr. "KEY_COMPROMISE"
+        if (certificate == null) throw new IllegalArgumentException("Certificate not found");
 
         RevokedCertificate revokedCertificate = new RevokedCertificate();
         revokedCertificate.setSerialNumber(serialNumber);
         revokedCertificate.setRevokedAt(new Date());
-        revokedCertificate.setReasonCode(rr);
+        revokedCertificate.setReasonCode(reason);
         revokedCertificate.setIssuerId(certificate.getIssuer().getId());
 
         revokedCertificateRepository.save(revokedCertificate);
+
+        try {
+            Certificate issuer = certificateRepository.findFirstBySubject(certificate.getIssuer());
+            if (issuer == null) throw new IllegalArgumentException("Issuer certificate not found");
+
+            PrivateKey issuerPrivateKey = getIssuerPrivateKey(issuer);
+            X500Name issuerName = issuer.getSubject().getX500Name();
+
+            revocationService.generateCRL(issuerPrivateKey, issuerName);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to update CRL", e);
+        }
     }
+
 
     public Certificate getRootCertificate() {
         return certificateRepository.findFirstByType(CertificateType.ROOT);
@@ -424,6 +436,9 @@ public class CertificateService {
         CertificateParty issuer = certificate.getIssuer();
         Organization org = certificate.getOrganization();
 
+        // Check if certificate is revoked
+        boolean revoked = revokedCertificateRepository.existsBySerialNumber(certificate.getSerialNumber());
+
         return new GetCertificateDTO(
                 certificate.getSerialNumber(),
 
@@ -448,7 +463,8 @@ public class CertificateService {
                 certificate.getType(),
                 org != null ? org.getName() : null,
                 certificate.getStartDate(),
-                certificate.getEndDate()
+                certificate.getEndDate(),
+                revoked 
         );
     }
 

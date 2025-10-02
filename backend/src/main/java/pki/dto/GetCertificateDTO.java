@@ -38,4 +38,6 @@ public class GetCertificateDTO {
 
     private Date validFrom;
     private Date validTo;
+
+    private boolean revoked;
 }

@@ -538,3 +538,28 @@
   font-size: 13px;
   word-break: break-all;
 }
+
+.status-valid {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.status-revoked {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.status-expired {
+  color: #6c757d;
+  font-weight: bold;
+}
+
+.status-pending {
+  color: #ffc107;
+  font-weight: bold;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
