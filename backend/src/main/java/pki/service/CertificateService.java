@@ -251,8 +251,6 @@ public class CertificateService {
         //TODO: sent certificate to user (it isn't saved in keystore)
 
         certificateRepository.save(certificate);
-
-//        keyStoreReader.downloadCertificate(x509certificate);
     }
 
     private String getRDNValue(X500Name name, ASN1ObjectIdentifier oid) {
@@ -328,7 +326,6 @@ public class CertificateService {
         if(issuerCertificate == null)
             return false;
 
-        // Učitaj issuer sertifikat iz keystore-a
         X509Certificate x509IssuerCert = (X509Certificate) keyStoreReader.readCertificate(
                 keyStoreFilePath, keystorePassword, issuerCertificate.getSerialNumber()
         );
@@ -336,28 +333,23 @@ public class CertificateService {
         if(x509IssuerCert == null)
             return false;
 
-        // Proveri da li su datumi validni u odnosu na issuer sertifikat
         if(x509IssuerCert.getNotBefore().after(startDate) || x509IssuerCert.getNotAfter().before(endDate))
             return false;
 
-        // Ako je ROOT, verifikacija je završena
         if(issuerCertificate.getType() == CertificateType.ROOT) {
             return true;
         }
 
-        // Ako nije ROOT, proveri issuer-a od issuer-a rekurzivno
         Certificate issuerOfIssuer = certificateRepository.findFirstBySubject(issuerCertificate.getIssuer());
         if(issuerOfIssuer == null)
             return false;
 
-        // Verifikuj potpis
         try {
             x509IssuerCert.verify(issuerOfIssuer.getPublicKey());
         } catch (InvalidKeyException | SignatureException e) {
             return false;
         }
 
-        // Rekurzivno proveri lanac
         return checkCertificateChainValidity(issuerCertificate.getIssuer(), startDate, endDate);
     }
 
@@ -503,7 +495,6 @@ public class CertificateService {
             issued = certificateRepository.findByIssuer_Organization(loggedUser.getOrganization());
         }
 
-        // Spoji u set da izbegneš duplikate
         Set<Certificate> all = new HashSet<>();
         if (owned != null) all.addAll(owned);
         if (issued != null) all.addAll(issued);
