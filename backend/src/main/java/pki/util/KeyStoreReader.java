@@ -16,6 +16,7 @@ public class KeyStoreReader {
         try {
             keyStore = KeyStore.getInstance("JKS", "SUN");
         } catch (KeyStoreException e) {
+            System.err.println("Error loading JKS: " + e.getMessage());
             e.printStackTrace();
         } catch (NoSuchProviderException e) {
             e.printStackTrace();

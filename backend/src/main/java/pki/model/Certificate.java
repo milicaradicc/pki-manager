@@ -30,8 +30,8 @@ public class Certificate {
 
     private Date startDate;
     private Date endDate;
-
-//    private boolean revoked;
-//    private String revocationReason;
-//    private String revocationDate;
+    @Column(name = "used_admin_kek")
+    private Boolean usedAdminKek;
+    @Column(name = "crl_distribution_point")
+    private String crlDistributionPoint;
 }
