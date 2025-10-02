@@ -32,4 +32,6 @@ public class Certificate {
     private Date endDate;
     @Column(name = "used_admin_kek")
     private Boolean usedAdminKek;
+    @Column(name = "crl_distribution_point")
+    private String crlDistributionPoint;
 }

@@ -1,6 +1,7 @@
 package pki.service;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.RDN;
@@ -38,6 +39,7 @@ import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.Instant;
 import java.util.*;
 
 @Service
@@ -47,7 +49,8 @@ public class CertificateService {
     private String adminWrappedKek;
     @Value("${app.keystore-password}")
     private String keystorePassword;
-
+    @Value("${app.crl-url}")
+    private String crlUrl;
     private static final String keyStoreFilePath = "src/main/resources/static/certificates.jks";
 
     private final CertificateRepository certificateRepository;
@@ -98,7 +101,6 @@ public class CertificateService {
         keyStoreWriter.saveKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
 
         certificateRepository.save(certificate);
-//        keyStoreReader.downloadCertificate(x509certificate);
     }
 
     public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
@@ -113,7 +115,6 @@ public class CertificateService {
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
 
-        // VAŽNO: Prvo proverite ceo lanac povlačenja
         checkCertificateChainRevocation(issuer);
 
         Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuer);
@@ -198,7 +199,6 @@ public class CertificateService {
         CertificateParty issuer = certificatePartyRepository.findById(issuerId)
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + issuerId + " not found"));
 
-        // VAŽNO: Proveri lanac povlačenja i ovde
         checkCertificateChainRevocation(issuer);
 
         Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuer);
@@ -290,7 +290,7 @@ public class CertificateService {
             certGen.addExtension(
                     Extension.basicConstraints,
                     true,
-                    new BasicConstraints(false)
+                    new BasicConstraints(false) // not a CA
             );
 
             certGen.addExtension(
@@ -298,18 +298,14 @@ public class CertificateService {
                     true,
                     new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment)
             );
-
-            // CRL Distribution Point URL (http://localhost:8080/crl/download)
-            // klijenti koji validiraju sertifikat mogu dohvatiti CRL i
-            // proveriti da li je sertifikat povučen
-            DistributionPointName distPoint = new DistributionPointName(
-                    new GeneralNames(
-                            new GeneralName(GeneralName.uniformResourceIdentifier, "https://localhost:8443/crl/download")
-                    )
-            );
-            DistributionPoint[] distPoints = new DistributionPoint[]{new DistributionPoint(distPoint, null, null)};
-            certGen.addExtension(Extension.cRLDistributionPoints, false, new CRLDistPoint(distPoints));
         }
+
+        String crlDpUrl = getCrlDistributionPointUrl(certificate.getIssuer());
+        DistributionPointName distPoint = new DistributionPointName(
+                new GeneralNames(new GeneralName(GeneralName.uniformResourceIdentifier, crlDpUrl))
+        );
+        DistributionPoint[] distPoints = new DistributionPoint[]{new DistributionPoint(distPoint, null, null)};
+        certGen.addExtension(Extension.cRLDistributionPoints, false, new CRLDistPoint(distPoints));
 
         X509CertificateHolder certHolder = certGen.build(contentSigner);
 
@@ -330,10 +326,12 @@ public class CertificateService {
                 keyStoreFilePath, keystorePassword, issuerCertificate.getSerialNumber()
         );
 
-        if(x509IssuerCert == null)
-            return false;
+        Instant start = startDate.toInstant();
+        Instant end = endDate.toInstant();
+        Instant certNotBefore = x509IssuerCert.getNotBefore().toInstant();
+        Instant certNotAfter = x509IssuerCert.getNotAfter().toInstant();
 
-        if(x509IssuerCert.getNotBefore().after(startDate) || x509IssuerCert.getNotAfter().before(endDate))
+        if(certNotBefore.isAfter(start) || certNotAfter.isBefore(end))
             return false;
 
         if(issuerCertificate.getType() == CertificateType.ROOT) {
@@ -353,11 +351,6 @@ public class CertificateService {
         return checkCertificateChainValidity(issuerCertificate.getIssuer(), startDate, endDate);
     }
 
-    /**
-     * Proverava da li je bilo koji sertifikat u lancu povučen
-     * @param issuerParty Issuer od koga počinjemo proveru
-     * @throws IllegalArgumentException ako je bilo koji sertifikat u lancu povučen
-     */
     private void checkCertificateChainRevocation(CertificateParty issuerParty) {
         Certificate currentCertificate = certificateRepository.findFirstBySubject(issuerParty);
 
@@ -435,6 +428,7 @@ public class CertificateService {
                 .toList();
     }
 
+    @Transactional
     public void revokeCertificate(String serialNumber, RevocationReason reason) {
         Certificate certificate = certificateRepository.findFirstBySerialNumber(serialNumber);
         if (certificate == null) throw new IllegalArgumentException("Certificate not found");
@@ -452,11 +446,17 @@ public class CertificateService {
             if (issuer == null) throw new IllegalArgumentException("Issuer certificate not found");
 
             PrivateKey issuerPrivateKey = getIssuerPrivateKey(issuer);
+            PublicKey issuerPublicKey = issuer.getPublicKey();
             X500Name issuerName = issuer.getSubject().getX500Name();
 
-            revocationService.generateCRL(issuerPrivateKey, issuerName);
+            revocationService.generateCRL(
+                    issuerPrivateKey,
+                    issuerName,
+                    certificate.getIssuer().getId(),
+                    issuerPublicKey
+            );
         } catch (Exception e) {
-            throw new RuntimeException("Failed to update CRL", e);
+            throw new RuntimeException("Failed to update CRL, rolling back revocation", e);
         }
     }
 
@@ -513,14 +513,12 @@ public class CertificateService {
         CertificateParty issuer = certificate.getIssuer();
         Organization org = certificate.getOrganization();
 
-        // Check if certificate is revoked
         boolean revoked = revokedCertificateRepository.existsBySerialNumber(certificate.getSerialNumber());
 
         return new GetCertificateDTO(
                 certificate.getSerialNumber(),
                 certificate.getSubject().getId(),
 
-                // Subject fields
                 subject != null ? subject.getCommonName() : null,
                 subject != null ? subject.getSurname() : null,
                 subject != null ? subject.getGivenName() : null,
@@ -529,7 +527,6 @@ public class CertificateService {
                 subject != null ? subject.getCountry() : null,
                 subject != null ? subject.getEmail() : null,
 
-                // Issuer fields
                 issuer != null ? issuer.getCommonName() : null,
                 issuer != null ? issuer.getSurname() : null,
                 issuer != null ? issuer.getGivenName() : null,
@@ -544,5 +541,23 @@ public class CertificateService {
                 certificate.getEndDate(),
                 revoked
         );
+    }
+
+    public Certificate getCertificateBySerialNumber(String serialNumber) {
+        return certificateRepository.findFirstBySerialNumber(serialNumber);
+    }
+
+    public List<Certificate> getAllCACertificates() {
+        return certificateRepository.findByTypeIn(
+                List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE)
+        );
+    }
+
+    private String getCrlDistributionPointUrl(CertificateParty issuerParty) {
+        Certificate issuerCert = certificateRepository.findFirstBySubject(issuerParty);
+        if (issuerCert == null) {
+            throw new IllegalArgumentException("Issuer certificate not found for CRL DP");
+        }
+        return crlUrl + "/" + issuerCert.getSerialNumber();
     }
 }
