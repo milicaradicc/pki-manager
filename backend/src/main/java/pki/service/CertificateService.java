@@ -7,9 +7,7 @@ import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
-import org.bouncycastle.asn1.x509.BasicConstraints;
-import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.asn1.x509.KeyUsage;
+import org.bouncycastle.asn1.x509.*;
 import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
@@ -319,7 +317,7 @@ public class CertificateService {
         return certConverter.getCertificate(certHolder);
     }
 
-    private boolean checkCertificateChainValidity(CertificateParty issuerParty, Date startDate, Date endDate)
+    boolean checkCertificateChainValidity(CertificateParty issuerParty, Date startDate, Date endDate)
             throws GeneralSecurityException, IOException {
 
         Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuerParty);

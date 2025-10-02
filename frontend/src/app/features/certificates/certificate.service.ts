@@ -5,8 +5,8 @@ import {CreateRootCertificateDTO} from './models/create-root-certificate-dto.mod
 import {GetCertificateDto} from './models/get-certificate-dto.model';
 import {CreateIntermediateCertificateDTO} from './models/create-intermediate-cetrificate-dto.model';
 import { environment } from '../../../environments/environment';
-import { AssignCertificateDTO } from './models/assign-certificate.dto';
-import { DownloadCertificateDTO } from './models/download-certificate.dto';
+import { AssignCertificateDTO } from './models/assign-certificate.model';
+import { DownloadCertificateDTO } from './models/download-certificate.model';
 import { CreateEndEntityCertificateDTO } from './models/create-end-entity-dto.model';
 
 @Injectable({

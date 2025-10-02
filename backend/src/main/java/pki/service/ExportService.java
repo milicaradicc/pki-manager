@@ -40,7 +40,7 @@ public class ExportService {
         if (certificate == null)
             throw new IllegalArgumentException("Certificate with serial number " + serialNumber + " not found");
 
-        if(certificateService.checkCertificateChainValidity(certificate.getSubject(), // not needed?
+        if(!certificateService.checkCertificateChainValidity(certificate.getSubject(),
                 certificate.getStartDate(), certificate.getEndDate()))
             throw new IllegalArgumentException("Error validating certificate chain");
 

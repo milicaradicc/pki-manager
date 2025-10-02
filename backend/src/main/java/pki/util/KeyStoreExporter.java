@@ -18,7 +18,7 @@ public class KeyStoreExporter {
                                               String alias,
                                               char[] password) throws KeyStoreException, CertificateException, IOException, NoSuchAlgorithmException {
         KeyStore ks = KeyStore.getInstance("PKCS12");
-        ks.load(null, null);
+        ks.load(null, password);
         ks.setKeyEntry(alias, privateKey, password, chain);
         try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
             ks.store(os, password);
