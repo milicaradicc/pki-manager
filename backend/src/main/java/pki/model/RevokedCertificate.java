@@ -18,6 +18,7 @@ public class RevokedCertificate {
     private String serialNumber;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "reason_code")
     private RevocationReason reasonCode;
 
     private Date revokedAt;
