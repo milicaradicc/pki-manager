@@ -95,16 +95,14 @@ public class CertificateController {
 
     @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
     @GetMapping("/owned")
-    public ResponseEntity<List<GetCertificateDTO>> getOwnedCertificates() {
-        return ResponseEntity.ok(certificateService.getOwnedCertificates());
+    public ResponseEntity<List<GetCertificateDTO>> getOwnedCertificates(@RequestParam(defaultValue = "true") boolean includeEndEntities) {
+        return ResponseEntity.ok(certificateService.getOwnedCertificates(includeEndEntities));
     }
-
 
     @PreAuthorize("hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca') or hasAuthority('ROLE_user')")
     @GetMapping("/{serialNumber}/download")
     public ResponseEntity<DownloadCertificateDTO> download(@PathVariable String serialNumber) throws IOException, GeneralSecurityException {
         DownloadCertificateDTO result = exportService.exportCertificate(serialNumber);
         return ResponseEntity.ok(result);
-//        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=certificate_" + serialNumber + ".cer").body(certificate);
     }
 }

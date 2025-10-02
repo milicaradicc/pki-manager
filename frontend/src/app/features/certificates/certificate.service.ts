@@ -41,8 +41,8 @@ export class CertificateService {
     return this.http.get<GetCertificateDto[]>(this.baseUrl);
   }
 
-  getOwnedCertificates(): Observable<GetCertificateDto[]> {
-    return this.http.get<GetCertificateDto[]>(`${this.baseUrl}/owned`);
+  getOwnedCertificates(includeEndEntity: boolean = true): Observable<GetCertificateDto[]> {
+    return this.http.get<GetCertificateDto[]>(`${this.baseUrl}/owned?includeEndEntity=${includeEndEntity}`);
   }
 
   assignCertificate(dto: AssignCertificateDTO): Observable<void> {

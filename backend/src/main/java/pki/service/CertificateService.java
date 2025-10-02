@@ -498,7 +498,7 @@ public class CertificateService {
         return keyService.unwrapPrivateKey(wrappedPrivateKey, wrappedDek, wrappedKek);
     }
 
-    public List<GetCertificateDTO> getOwnedCertificates() {
+    public List<GetCertificateDTO> getOwnedCertificates(boolean includeEndEntities) {
         User loggedUser = userService.getLoggedUser();
 
         List<Certificate> owned = loggedUser.getOwnedCertificates();
@@ -512,9 +512,15 @@ public class CertificateService {
         if (owned != null) all.addAll(owned);
         if (issued != null) all.addAll(issued);
 
-        return all.stream()
-                .map(this::mapToGetCertificateDTO)
-                .toList();
+        if (!includeEndEntities)
+            return all.stream()
+                    .map(this::mapToGetCertificateDTO)
+                    .toList();
+        else
+            return all.stream()
+                    .filter(c -> c.getType() != CertificateType.END_ENTITY)
+                    .map(this::mapToGetCertificateDTO)
+                    .toList();
     }
 
     private GetCertificateDTO mapToGetCertificateDTO(Certificate certificate) {
