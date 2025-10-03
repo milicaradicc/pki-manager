@@ -112,15 +112,18 @@ public class CertificateService {
         certificateRepository.save(certificate);
     }
 
+    @Transactional
     public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
         issueNonRootCertificate(certificateDTO, true);
     }
 
+    @Transactional
     public DownloadCertificateDTO issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
         return issueNonRootCertificate(certificateDTO, false);
     }
 
-    private DownloadCertificateDTO issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
+    @Transactional
+    protected DownloadCertificateDTO issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
 
@@ -238,6 +241,7 @@ public class CertificateService {
     }
 
 
+    @Transactional
     public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, GeneralSecurityException, OperatorCreationException {
         //TODO: add extensions
         //TODO: decide if this is only for end-entity users
@@ -305,8 +309,13 @@ public class CertificateService {
                 issuerWrappedKek);
         X509Certificate x509certificate = generateCertificate(certificate, issuerPrivateKey, false);
 
+        keyStoreWriter.loadKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
+        keyStoreWriter.write(serialNumber, null, null , x509certificate);
+        keyStoreWriter.saveKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
+
         certificateRepository.save(certificate);
-        keyStoreReader.downloadCertificate(x509certificate);
+        user.getOwnedCertificates().add(certificate);
+        userRepository.save(user);
     }
 
     private HashSet<KeyUsageModel> getKeyUsagesFromCsr(PKCS10CertificationRequest csr) {
@@ -719,7 +728,7 @@ public class CertificateService {
         if (owned != null) all.addAll(owned);
         if (issued != null) all.addAll(issued);
 
-        if (!includeEndEntities)
+        if (includeEndEntities)
             return all.stream()
                     .map(this::mapToGetCertificateDTO)
                     .toList();

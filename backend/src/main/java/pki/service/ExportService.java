@@ -47,7 +47,7 @@ public class ExportService {
         return exportCertificate(certificate, null);
     }
     public DownloadCertificateDTO exportCertificate(Certificate certificate, PrivateKey privateKey) throws GeneralSecurityException, IOException {
-        if(!checkCertificateChainValidity(certificate.getSubject(),
+        if(!checkCertificateChainValidity(certificate.getIssuer(),
                 certificate.getStartDate(), certificate.getEndDate()))
             throw new IllegalArgumentException("Error validating certificate chain");
 
