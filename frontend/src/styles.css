@@ -1,0 +1,42 @@
+/* You can add global styles to this file, and also import other style files */
+
+.download-warning {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+  padding: 12px 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+.download-info {
+  background-color: #e2ffff;
+  border: 1px solid #07bdff;
+  color: #047085;
+  padding: 12px 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+.password-display {
+  font-family: monospace;
+  color: #2c3e50;
+  font-size: 13px;
+  word-break: break-all;
+}
+.alias-display {
+  font-family: monospace;
+  color: #2c3e50;
+  font-size: 13px;
+  word-break: break-all;
+}
+.copy-btn {
+  padding: 0 !important;
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+}
+.copy-btn mat-icon {
+  font-size: 18px;
+}
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }

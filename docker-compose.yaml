@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: 'postgres:latest'
+    container_name: pki-postgres
+    environment:
+      - POSTGRES_DB=pki 
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/initdb:/docker-entrypoint-initdb.d
+      - ./db/scripts:/scripts
+    healthcheck:
+      test: ["CMD-SHELL", "sh /scripts/healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: 'dpage/pgadmin4:latest'
+    container_name: pki-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: 'admin@example.com'
+      PGADMIN_DEFAULT_PASSWORD: 'admin'
+    ports:
+      - '5050:80'
+    depends_on:
+      - postgres
+
+  keycloak:
+    env_file:
+      - .env
+    image: quay.io/keycloak/keycloak:26.0.2
+    container_name: pki-keycloak
+    command: start
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: user
+      KC_DB_PASSWORD: password
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME_STRICT: false
+      KC_HTTP_ENABLED: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_LOG_LEVEL: INFO
+      KC_HTTPS_KEY_STORE_FILE: /opt/keycloak/certs/domain.pfx
+      KC_HTTPS_KEY_STORE_PASSWORD: ${KC_KEYSTORE_PASSWORD}
+      KC_HOSTNAME: localhost
+      KC_PROVIDERS: all
+    ports:
+      - '9443:8443'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./keycloak_certs:/opt/keycloak/certs
+      - ./keycloak_providers:/opt/keycloak/providers
+
+
+volumes:
+  postgres_data:

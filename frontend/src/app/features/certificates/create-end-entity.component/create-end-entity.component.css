@@ -1,0 +1,209 @@
+.register-container {
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
+  border-radius: 10px;
+  background-color: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.outer-container {
+  padding: 2em;
+}
+
+form {
+  margin: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+mat-form-field {
+  width: 100%;
+  max-width: 600px;
+}
+
+/* Grupa elemenata u formi */
+form > div {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Naslov forme */
+.form-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.form-header h1 {
+  font-size: 26px;
+  color: #252629;
+  margin-bottom: 5px;
+}
+
+.submit-section {
+  text-align: center;
+}
+
+.submit-btn {
+  width: 50%;
+  padding: 10px;
+  font-size: 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+mat-button-toggle-group {
+  margin: 1em;
+  display: flex;
+  justify-content: center;
+}
+
+.budget-items-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 600px;
+  margin-top: 1rem;
+}
+
+.budget-item-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.budget-item-form mat-form-field {
+  flex: 1 1 45%;
+  min-width: 200px;
+}
+
+.full-width-table {
+  width: 100%;
+  max-width: 700px;
+  margin-top: 1rem;
+}
+
+::ng-deep .mat-mdc-button:not(:disabled) {
+  background-color: white !important;
+  color: #000000 !important;
+}
+
+::ng-deep .mat-mdc-button:not(:disabled):hover {
+  background-color: #bebce6 !important;
+  color: white !important;
+}
+
+::ng-deep .mat-mdc-snack-bar-container .mat-mdc-snackbar-surface {
+  background-color: #fff !important;
+  color: #000000 !important;
+}
+
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-small {
+  max-width: 500px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f8f9fa;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+.modal-body {
+  padding: 25px;
+}
+.modal-footer {
+  padding: 20px 25px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background-color: #f8f9fa;
+}
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: #3498db;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+.btn-success {
+  background-color: #27ae60;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #229954;
+}
+
+.btn-secondary {
+  background-color: #95a5a6;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #7f8c8d;
+}

@@ -1,0 +1,107 @@
+.register-container {
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
+  border-radius: 10px;
+  background-color: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.outer-container {
+  padding: 2em;
+}
+
+form {
+  margin: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+mat-form-field {
+  width: 100%;
+  max-width: 600px;
+}
+
+/* Grupa elemenata u formi */
+form > div {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Naslov forme */
+.form-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.form-header h1 {
+  font-size: 26px;
+  color: #252629;
+  margin-bottom: 5px;
+}
+
+.submit-section {
+  text-align: center;
+}
+
+.submit-btn {
+  width: 50%;
+  padding: 10px;
+  font-size: 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+mat-button-toggle-group {
+  margin: 1em;
+  display: flex;
+  justify-content: center;
+}
+
+.budget-items-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 600px;
+  margin-top: 1rem;
+}
+
+.budget-item-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.budget-item-form mat-form-field {
+  flex: 1 1 45%;
+  min-width: 200px;
+}
+
+.full-width-table {
+  width: 100%;
+  max-width: 700px;
+  margin-top: 1rem;
+}
+
+::ng-deep .mat-mdc-button:not(:disabled) {
+  background-color: white !important;
+  color: #000000 !important;
+}
+
+::ng-deep .mat-mdc-button:not(:disabled):hover {
+  background-color: #bebce6 !important;
+  color: white !important;
+}
+
+::ng-deep .mat-mdc-snack-bar-container .mat-mdc-snackbar-surface {
+  background-color: #fff !important;
+  color: #000000 !important;
+}

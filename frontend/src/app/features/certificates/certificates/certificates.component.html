@@ -1,0 +1,370 @@
+<div class="management-container">
+  <div class="header">
+    <h1>Certificate Management</h1>
+    <div class="header-actions">
+      <button 
+        class="btn btn-primary" 
+        (click)="loadCertificates()"
+        [disabled]="loading">
+        Refresh
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="error" class="alert alert-error">
+    <span>{{ error }}</span>
+    <button class="close-btn" (click)="clearMessages()">&times;</button>
+  </div>
+
+  <div *ngIf="success" class="alert alert-success">
+    <span>{{ success }}</span>
+    <button class="close-btn" (click)="clearMessages()">&times;</button>
+  </div>
+
+  <div *ngIf="loading" class="loading">
+    <div class="spinner"></div>
+    <span>Loading certificates...</span>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h2>Certificate Hierarchy ({{ certificates.length }})</h2>
+    </div>
+
+    <div *ngIf="certificates.length === 0 && !loading" class="no-certificates">
+      No certificates found.
+    </div>
+
+    <div *ngIf="certificates.length > 0" class="certificates-table-container">
+      <table class="certificates-table">
+        <thead>
+          <tr>
+            <th style="width: 40px;"></th>
+            <th>Serial Number</th>
+            <th>Type</th>
+            <th>Subject</th>
+            <th>Organization</th>
+            <th>Valid From</th>
+            <th>Valid To</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let node of flattenedTree" 
+              class="cert-row"
+              [class.revoked-parent]="node.hasRevokedParent">
+            <td class="expand-cell">
+              <button 
+                *ngIf="node.children.length > 0"
+                class="expand-btn"
+                (click)="toggleExpand(node)"
+                [style.margin-left.px]="node.level * 20">
+                {{ node.expanded ? '▼' : '▶' }}
+              </button>
+              <span *ngIf="node.children.length === 0" 
+                    [style.margin-left.px]="node.level * 20 + 20">
+              </span>
+            </td>
+            <td class="serial-number" [title]="node.certificate.serialNumber">
+              <span [style.margin-left.px]="node.children.length === 0 ? 0 : 0">
+                {{ node.certificate.serialNumber | slice:0:12 }}...
+              </span>
+            </td>
+            <td>
+              <span 
+                class="type-badge" 
+                [ngClass]="{
+                  'type-root': node.certificate.type === 'ROOT',
+                  'type-intermediate': node.certificate.type === 'INTERMEDIATE',
+                  'type-end-entity': node.certificate.type === 'END_ENTITY'
+                }">
+                {{ node.certificate.type }}
+              </span>
+            </td>
+            <td class="subject-info">
+              <div class="primary-text">{{ node.certificate.subjectCommonName || '-' }}</div>
+              <div class="secondary-text" *ngIf="node.certificate.subjectEmail">
+                {{ node.certificate.subjectEmail }}
+              </div>
+              <div class="secondary-text" *ngIf="node.certificate.subjectGivenName || node.certificate.subjectSurname">
+                {{ node.certificate.subjectGivenName }} {{ node.certificate.subjectSurname }}
+              </div>
+            </td>
+            <td>
+              <div class="primary-text">{{ node.certificate.subjectOrganization || '-' }}</div>
+              <div class="secondary-text" *ngIf="node.certificate.subjectOrganizationalUnit">
+                {{ node.certificate.subjectOrganizationalUnit }}
+              </div>
+              <div class="secondary-text" *ngIf="node.certificate.subjectCountry">
+                {{ node.certificate.subjectCountry }}
+              </div>
+            </td>
+            <td>{{ node.certificate.validFrom | date:'dd.MM.yyyy HH:mm' }}</td>
+            <td>{{ node.certificate.validTo | date:'dd.MM.yyyy HH:mm' }}</td>
+            <td>
+              <span [class]="getStatusClass(node.certificate)">
+                {{ getStatus(node.certificate) }}
+              </span>
+            </td>
+            <td class="actions">
+              <button 
+                class="btn btn-success btn-sm" 
+                (click)="createCertificate(node.certificate.serialNumber)"
+                [disabled]="!canCreateCertificate(node) || loading"
+                [title]="canCreateCertificate(node) ? 'Create Certificate' : 'Cannot create - parent revoked or expired'">
+                Create
+              </button>
+              <button 
+                class="btn btn-primary btn-sm" 
+                (click)="viewDetails(node.certificate)"
+                [disabled]="loading"
+                title="View Details">
+                Details
+              </button>
+              <button 
+                class="btn btn-secondary btn-sm" 
+                (click)="download(node.certificate.serialNumber)"
+                [disabled]="node.certificate.revoked || loading"
+                title="Download Certificate">
+                Download
+              </button>
+              <button 
+                (click)="revoke(node.certificate.serialNumber)" 
+                [disabled]="node.certificate.revoked || loading"
+                class="btn btn-danger btn-sm">
+                {{ node.certificate.revoked ? 'Revoked' : 'Revoke' }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Certificate Details Modal -->
+  <div *ngIf="selectedCertificate" class="modal-overlay" (click)="closeDetails()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Certificate Details</h2>
+        <button class="close-btn" (click)="closeDetails()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="details-section">
+          <h3>General Information</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Serial Number:</label>
+              <span>{{ selectedCertificate.serialNumber }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Type:</label>
+              <span>{{ selectedCertificate.type }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Organization:</label>
+              <span>{{ selectedCertificate.organizationName || '-' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3>Subject Information</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Common Name:</label>
+              <span>{{ selectedCertificate.subjectCommonName || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Given Name:</label>
+              <span>{{ selectedCertificate.subjectGivenName || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Surname:</label>
+              <span>{{ selectedCertificate.subjectSurname || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Email:</label>
+              <span>{{ selectedCertificate.subjectEmail || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Organization:</label>
+              <span>{{ selectedCertificate.subjectOrganization || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Organizational Unit:</label>
+              <span>{{ selectedCertificate.subjectOrganizationalUnit || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Country:</label>
+              <span>{{ selectedCertificate.subjectCountry || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Alternative Name:</label>
+              <span>{{ selectedCertificate.subjectAlternativeName || '-' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3>Issuer Information</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Common Name:</label>
+              <span>{{ selectedCertificate.issuerCommonName || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Given Name:</label>
+              <span>{{ selectedCertificate.issuerGivenName || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Surname:</label>
+              <span>{{ selectedCertificate.issuerSurname || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Email:</label>
+              <span>{{ selectedCertificate.issuerEmail || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Organization:</label>
+              <span>{{ selectedCertificate.issuerOrganization || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Organizational Unit:</label>
+              <span>{{ selectedCertificate.issuerOrganizationalUnit || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Country:</label>
+              <span>{{ selectedCertificate.issuerCountry || '-' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Alternative Name:</label>
+              <span>{{ selectedCertificate.issuerAlternativeName || '-' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3>Validity Period</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Valid From:</label>
+              <span>{{ selectedCertificate.validFrom | date:'full' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Valid To:</label>
+              <span>{{ selectedCertificate.validTo | date:'full' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3>Extentions</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Key Usages:</label>
+              <span>{{ formatUsage(selectedCertificate.keyUsages) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Extended Key Usages:</label>
+              <span>{{ formatUsage(selectedCertificate.extendedKeyUsages) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDetails()">Close</button>
+        <button class="btn btn-primary" (click)="download(selectedCertificate.serialNumber)" [disabled]="selectedCertificate.revoked">
+          Download Certificate
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Revocation Modal -->
+  <div *ngIf="showRevocationPopup" class="modal-overlay" (click)="cancelRevocation()">
+    <div class="modal-content modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Revoke Certificate</h2>
+        <button class="close-btn" (click)="cancelRevocation()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="revocation-warning">
+          <strong>Warning:</strong> This action cannot be undone. Revoking this certificate will also disable the ability to create new certificates from it. Please select a revocation reason.
+        </div>
+        
+        <div class="form-group">
+          <label for="revocationReason">Revocation Reason <span class="required">*</span></label>
+          <select 
+            id="revocationReason" 
+            class="form-select" 
+            [(ngModel)]="selectedReason"
+            [disabled]="loading">
+            <option [ngValue]="null">Select a reason...</option>
+            <option *ngFor="let reason of revocationReasons" [ngValue]="reason">
+              {{ formatRevocationReason(reason) }}
+            </option>
+          </select>
+        </div>
+
+        <div class="certificate-info">
+          <label>Certificate Serial Number:</label>
+          <span class="serial-display">{{ revokingCertificateSerial }}</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button 
+          class="btn btn-secondary" 
+          (click)="cancelRevocation()"
+          [disabled]="loading">
+          Cancel
+        </button>
+        <button 
+          class="btn btn-danger" 
+          (click)="confirmRevocation()"
+          [disabled]="!selectedReason || loading">
+          Confirm Revocation
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Download Modal -->
+  <div *ngIf="downloadDto" class="modal-overlay" (click)="closeDownload()">
+    <div class="modal-content modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Keystore Password</h2>
+      </div>
+      <div class="modal-body">
+        <div class="download-warning">
+          @if(downloadDto.withPrivateKey) {
+          <strong>Warning:</strong> Copy the password below and store it in a safe place. This password will be required to access the keystore and the private key of this certificate. This password will only be shown once.
+          } @else {
+            <strong>Warning:</strong> Copy the password below and store it in a safe place. This password will be required to access the keystore of this certificate. This password will only be shown once.
+          }
+        </div>
+        <div class="download-info">
+          @if(downloadDto.withPrivateKey) {
+            <strong>Info: The certificate is stored in a PKCS12 keystore, under the alias <span class="alias-display"><strong>{{ downloadDto.alias }}</strong></span>. The keystore and the private key are protected with the password you'll see below.</strong>
+          } @else {
+            <strong>Info: The certificate is stored in a PKCS12 keystore, under the alias <span class="alias-display"><strong>{{ downloadDto.alias }}</strong></span>. The keystore is protected with the password you'll see below.</strong>
+          }
+        </div>
+        
+        <p>Password: <span class="password-display"><strong>{{ downloadDto.keystorePassword }}</strong></span>
+          <button matIconButton="icon" aria-label="Copy Password" matTooltip="Copy Password" (click)="copyPassword()" class="copy-btn">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button 
+          class="btn btn-secondary" 
+          (click)="closeDownload()"
+          [disabled]="loading">
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
