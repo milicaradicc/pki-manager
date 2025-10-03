@@ -359,6 +359,18 @@ public class CertificateService {
             );
         }
 
+        if(certificate.getSubject().getAlternativeName()!=null && !certificate.getSubject().getAlternativeName().isEmpty()){
+            GeneralName altName = new GeneralName(GeneralName.dNSName, certificate.getSubject().getAlternativeName());
+            GeneralNames subjectAltName = new GeneralNames(altName);
+            certGen.addExtension(Extension.subjectAlternativeName, false, subjectAltName);
+        }
+
+        if(certificate.getIssuer().getAlternativeName()!=null && !certificate.getIssuer().getAlternativeName().isEmpty()){
+            GeneralName altName = new GeneralName(GeneralName.dNSName, certificate.getIssuer().getAlternativeName());
+            GeneralNames issuerAltName = new GeneralNames(altName);
+            certGen.addExtension(Extension.issuerAlternativeName, false, issuerAltName);
+        }
+
 
         String crlDpUrl;
         if (certificate.getType() == CertificateType.ROOT) {

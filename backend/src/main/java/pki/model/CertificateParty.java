@@ -30,6 +30,7 @@ public class CertificateParty {
     private String organizationalUnit;
     private String country;
     private String email;
+    private String alternativeName;
 
     public X500Name getX500Name(){
         X500NameBuilder builder = new X500NameBuilder(BCStyle.INSTANCE);
