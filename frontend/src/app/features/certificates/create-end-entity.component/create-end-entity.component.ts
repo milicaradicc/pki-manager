@@ -83,7 +83,8 @@ export class CreateEndEntityComponent implements OnInit{
       startDate: ['', Validators.required],
       endDate: ['', Validators.required],
       keyUsages:[[]],
-      extendedKeyUsages:[[]]
+      extendedKeyUsages:[[]],
+      alternativeName:['']
     });
 
     this.certificateService.getAllCaCertificates().subscribe({
@@ -109,6 +110,7 @@ export class CreateEndEntityComponent implements OnInit{
           organizationalUnit: formValues.organizationalUnit,
           country: formValues.country,
           email: formValues.email,
+          alternativeName:formValues.alternativeName
         } as CreateCertificatePartyDTO,
         startDate: (new Date(formValues.startDate.getTime() - formValues.startDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0],
         endDate: (new Date(formValues.endDate.getTime() - formValues.endDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0],

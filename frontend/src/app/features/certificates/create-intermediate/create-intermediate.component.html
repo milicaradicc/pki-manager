@@ -49,6 +49,11 @@
         <input matInput type="email" formControlName="email">
       </mat-form-field>
 
+      <mat-form-field appearance="outline">
+        <mat-label>Alternative name</mat-label>
+        <input matInput formControlName="alternativeName">
+      </mat-form-field>
+
       <mat-form-field>
         <mat-label>Start Date</mat-label>
         <input [min]="today" formControlName="startDate" matInput [matDatepicker]="picker1">
