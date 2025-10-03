@@ -111,6 +111,8 @@ public class CertificateService {
         keyStoreWriter.write(serialNumber, keyPair.getPrivate(), password , x509certificate);
         keyStoreWriter.saveKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
 
+        certificate.setKeyUsages(Set.of(KeyUsageModel.KEY_CERT_SIGN, KeyUsageModel.CRL_SIGN));
+
         certificateRepository.save(certificate);
     }
 
@@ -201,6 +203,9 @@ public class CertificateService {
         keyStoreWriter.write(serialNumber, keyPair.getPrivate(), password , x509certificate);
         keyStoreWriter.saveKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
 
+        if(intermediate)
+            certificate.setKeyUsages(Set.of(KeyUsageModel.KEY_CERT_SIGN, KeyUsageModel.CRL_SIGN));
+
         certificateRepository.save(certificate);
 
         boolean isUser = Objects.equals(userService.getPrimaryRole(), "user");
@@ -212,8 +217,9 @@ public class CertificateService {
             userRepository.save(user);
         }
 
-        if (intermediate)
+        if (intermediate) {
             return null;
+        }
         else
             return exportService.exportCertificate(certificate, keyPair.getPrivate());
     }
