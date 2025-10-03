@@ -3,7 +3,11 @@ package pki.service;
 import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.DERIA5String;
+import org.bouncycastle.asn1.pkcs.Attribute;
+import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
@@ -150,7 +154,7 @@ public class CertificateService {
 
         String serialNumber = UUID.randomUUID().toString().replace("-","");
 
-        HashSet<ExtendedKeyUsageModel> extendedKeyUsages = resolveExtendedKeyUsages(certificateDTO, issuerCertificate);
+        HashSet<ExtendedKeyUsageModel> extendedKeyUsages = resolveExtendedKeyUsages(certificateDTO.getExtendedKeyUsages(), issuerCertificate);
         HashSet<KeyUsageModel> keyUsages = new HashSet<>();
         if(!intermediate && certificateDTO instanceof CreateEndEntityCertificateDTO endEntityDTO){
             if(endEntityDTO.getKeyUsages() != null && !endEntityDTO.getKeyUsages().isEmpty()){
@@ -200,19 +204,19 @@ public class CertificateService {
         keyStoreReader.downloadCertificate(x509certificate);
     }
 
-    private HashSet<ExtendedKeyUsageModel> resolveExtendedKeyUsages(CreateNonRootCertificateDTO certificateDTO, Certificate issuerCertificate){
+    private HashSet<ExtendedKeyUsageModel> resolveExtendedKeyUsages(List<ExtendedKeyUsageModel> certificateEKUs, Certificate issuerCertificate){
         HashSet<ExtendedKeyUsageModel> extendedKeyUsages = new HashSet<>();
 
         if(issuerCertificate.getExtendedKeyUsages()!=null && !issuerCertificate.getExtendedKeyUsages().isEmpty()){
-            if(certificateDTO.getExtendedKeyUsages() == null || certificateDTO.getExtendedKeyUsages().isEmpty())
+            if(certificateEKUs == null || certificateEKUs.isEmpty())
                 extendedKeyUsages.addAll(issuerCertificate.getExtendedKeyUsages());
             else{
-                checkExtendedKeyUsage(issuerCertificate.getExtendedKeyUsages(), certificateDTO.getExtendedKeyUsages());
-                extendedKeyUsages.addAll(certificateDTO.getExtendedKeyUsages());
+                checkExtendedKeyUsage(issuerCertificate.getExtendedKeyUsages(), certificateEKUs);
+                extendedKeyUsages.addAll(certificateEKUs);
             }
         }
         else{
-            extendedKeyUsages.addAll(certificateDTO.getExtendedKeyUsages());
+            extendedKeyUsages.addAll(certificateEKUs);
         }
 
         return extendedKeyUsages;
@@ -256,6 +260,7 @@ public class CertificateService {
         subject.setOrganizationalUnit(getRDNValue(csrSubject, BCStyle.OU));
         subject.setCountry(getRDNValue(csrSubject, BCStyle.C));
         subject.setEmail(getRDNValue(csrSubject, BCStyle.EmailAddress));
+        subject.setAlternativeName(getFirstSubjectAlternativeName(csr));
 
         subject.setId(java.util.UUID.randomUUID().toString());
         subject = certificatePartyRepository.save(subject);
@@ -263,7 +268,11 @@ public class CertificateService {
         User user = userService.getLoggedUser();
         String serialNumber = UUID.randomUUID().toString().replace("-","");
 
-        // TODO: add private key wrapping in case of auto generated key pair
+        HashSet<KeyUsageModel> keyUsages = getKeyUsagesFromCsr(csr);
+        List<ExtendedKeyUsageModel> extendedKeyUsages = getExtendedKeyUsagesFromCsr(csr);
+
+        HashSet<ExtendedKeyUsageModel> resolvedExtendedKeyUsages = resolveExtendedKeyUsages(extendedKeyUsages, issuerCertificate);
+
         Certificate certificate = Certificate.builder()
                 .serialNumber(serialNumber)
                 .subject(subject)
@@ -276,6 +285,8 @@ public class CertificateService {
                 .endDate(endDate)
                 .organization(user.getOrganization())
                 .usedAdminKek(userService.getPrimaryRole().equals("admin"))
+                .extendedKeyUsages(resolvedExtendedKeyUsages)
+                .keyUsages(keyUsages)
                 .build();
 
         String issuerWrappedKek = (issuerCertificate.getUsedAdminKek() != null && issuerCertificate.getUsedAdminKek())
@@ -289,6 +300,107 @@ public class CertificateService {
         //TODO: sent certificate to user (it isn't saved in keystore)
 
         certificateRepository.save(certificate);
+        keyStoreReader.downloadCertificate(x509certificate);
+    }
+
+    private HashSet<KeyUsageModel> getKeyUsagesFromCsr(PKCS10CertificationRequest csr) {
+        HashSet<KeyUsageModel> keyUsages = new HashSet<>();
+
+        for (Attribute attr : csr.getAttributes()) {
+            if (attr.getAttrType().equals(PKCSObjectIdentifiers.pkcs_9_at_extensionRequest)) {
+                ASN1Encodable extValue = attr.getAttrValues().getObjectAt(0);
+                Extensions extensions = Extensions.getInstance(extValue);
+
+                Extension keyUsageExt = extensions.getExtension(Extension.keyUsage);
+                if (keyUsageExt != null) {
+                    KeyUsage keyUsage = KeyUsage.getInstance(keyUsageExt.getParsedValue());
+
+                    if (keyUsage.hasUsages(KeyUsage.digitalSignature)) {
+                        keyUsages.add(KeyUsageModel.DIGITAL_SIGNATURE);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.nonRepudiation)) {
+                        keyUsages.add(KeyUsageModel.NON_REPUDIATION);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.keyEncipherment)) {
+                        keyUsages.add(KeyUsageModel.KEY_ENCIPHERMENT);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.dataEncipherment)) {
+                        keyUsages.add(KeyUsageModel.DATA_ENCIPHERMENT);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.keyAgreement)) {
+                        keyUsages.add(KeyUsageModel.KEY_AGREEMENT);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.keyCertSign)) {
+                        keyUsages.add(KeyUsageModel.KEY_CERT_SIGN);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.cRLSign)) {
+                        keyUsages.add(KeyUsageModel.CRL_SIGN);
+                    }
+                }
+            }
+        }
+        return keyUsages;
+    }
+
+    private List<ExtendedKeyUsageModel> getExtendedKeyUsagesFromCsr(PKCS10CertificationRequest csr) {
+        List<ExtendedKeyUsageModel> extendedKeyUsages = new ArrayList<>();
+
+        for (Attribute attr : csr.getAttributes()) {
+            if (attr.getAttrType().equals(PKCSObjectIdentifiers.pkcs_9_at_extensionRequest)) {
+                ASN1Encodable extValue = attr.getAttrValues().getObjectAt(0);
+                Extensions extensions = Extensions.getInstance(extValue);
+
+                Extension ekuExt = extensions.getExtension(Extension.extendedKeyUsage);
+                if (ekuExt != null) {
+                    ExtendedKeyUsage eku = ExtendedKeyUsage.getInstance(ekuExt.getParsedValue());
+
+                    for (KeyPurposeId purposeId : eku.getUsages()) {
+                        String oid = purposeId.getId();
+                        switch (oid) {
+                            case "1.3.6.1.5.5.7.3.1":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.SERVER_AUTH);
+                                break;
+                            case "1.3.6.1.5.5.7.3.2":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.CLIENT_AUTH);
+                                break;
+                            case "1.3.6.1.5.5.7.3.3":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.CODE_SIGNING);
+                                break;
+                            case "1.3.6.1.5.5.7.3.4":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.EMAIL_PROTECTION);
+                                break;
+                            case "1.3.6.1.5.5.7.3.8":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.TIME_STAMPING);
+                                break;
+                            case "1.3.6.1.5.5.7.3.9":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.OCSP_SIGNING);
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+        return extendedKeyUsages;
+    }
+
+    private String getFirstSubjectAlternativeName(PKCS10CertificationRequest csr) {
+        for (Attribute attr : csr.getAttributes()) {
+            if (attr.getAttrType().equals(PKCSObjectIdentifiers.pkcs_9_at_extensionRequest)) {
+                ASN1Encodable extValue = attr.getAttrValues().getObjectAt(0);
+                Extensions extensions = Extensions.getInstance(extValue);
+
+                Extension sanExt = extensions.getExtension(Extension.subjectAlternativeName);
+                if (sanExt != null) {
+                    GeneralNames gns = GeneralNames.getInstance(sanExt.getParsedValue());
+                    for (GeneralName gn : gns.getNames()) {
+                        if (gn.getTagNo() == GeneralName.dNSName) {
+                            return DERIA5String.getInstance(gn.getName()).getString();
+                        }
+                    }
+                }
+            }
+        }
+        return null; // no SAN found
     }
 
     private String getRDNValue(X500Name name, ASN1ObjectIdentifier oid) {
