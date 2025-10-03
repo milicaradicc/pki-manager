@@ -24,6 +24,7 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequest;
 import org.bouncycastle.util.io.pem.PemReader;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pki.dto.*;
@@ -51,11 +52,12 @@ import java.util.*;
 public class CertificateService {
     @Value("${app.admin-wrapped-kek}")
     private String adminWrappedKek;
-    @Value("${app.keystore-password}")
+    @Value("${app.certificate-keystore-password}")
     private String keystorePassword;
+    @Value("${app.certificate-keystore-path}")
+    private String keyStoreFilePath;
     @Value("${app.crl-url}")
     private String crlUrl;
-    private static final String keyStoreFilePath = "src/main/resources/static/certificates.jks";
 
     private final CertificateRepository certificateRepository;
     private final CertificatePartyRepository certificatePartyRepository;
@@ -506,7 +508,6 @@ public class CertificateService {
 
         return certConverter.getCertificate(certHolder);
     }
-
     public int mapKeyUsage(KeyUsageModel model){
         return switch (model) {
             case DIGITAL_SIGNATURE -> KeyUsage.digitalSignature;
@@ -530,11 +531,7 @@ public class CertificateService {
         };
     }
 
-
-
-
-
-    private boolean checkCertificateChainValidity(CertificateParty issuerParty, Date startDate, Date endDate)
+    boolean checkCertificateChainValidity(CertificateParty issuerParty, Date startDate, Date endDate)
             throws GeneralSecurityException, IOException {
 
         Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuerParty);
@@ -647,6 +644,17 @@ public class CertificateService {
                 .toList();
     }
 
+    public boolean checkCertificatePermission(Certificate certificate, List<Certificate> ownedCertificates) {
+        if(ownedCertificates.stream().anyMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
+            return true;
+        if (certificate.getType()==CertificateType.ROOT)
+            return false;
+        Certificate issuerCertificate = certificateRepository.findFirstBySubject(certificate.getIssuer());
+        if(issuerCertificate == null)
+            return false;
+        return checkCertificatePermission(issuerCertificate, ownedCertificates);
+    }
+
     @Transactional
     public void revokeCertificate(String serialNumber, RevocationReason reason) {
         Certificate certificate = certificateRepository.findFirstBySerialNumber(serialNumber);
@@ -704,7 +712,7 @@ public class CertificateService {
         return keyService.unwrapPrivateKey(wrappedPrivateKey, wrappedDek, wrappedKek);
     }
 
-    public List<GetCertificateDTO> getOwnedCertificates() {
+    public List<GetCertificateDTO> getOwnedCertificates(boolean includeEndEntities) {
         User loggedUser = userService.getLoggedUser();
 
         List<Certificate> owned = loggedUser.getOwnedCertificates();
@@ -718,9 +726,15 @@ public class CertificateService {
         if (owned != null) all.addAll(owned);
         if (issued != null) all.addAll(issued);
 
-        return all.stream()
-                .map(this::mapToGetCertificateDTO)
-                .toList();
+        if (!includeEndEntities)
+            return all.stream()
+                    .map(this::mapToGetCertificateDTO)
+                    .toList();
+        else
+            return all.stream()
+                    .filter(c -> c.getType() != CertificateType.END_ENTITY)
+                    .map(this::mapToGetCertificateDTO)
+                    .toList();
     }
 
     private GetCertificateDTO mapToGetCertificateDTO(Certificate certificate) {

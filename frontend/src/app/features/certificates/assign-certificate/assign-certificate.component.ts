@@ -6,7 +6,7 @@ import { GetCertificateDto } from '../models/get-certificate-dto.model';
 import { CertificateService } from '../certificate.service';
 import { UserService } from '../../users/user.service';
 import { CaUserDto } from '../../users/models/ca-user.dto';
-import { AssignCertificateDTO } from '../models/assign-certificate.dto';
+import { AssignCertificateDTO } from '../models/assign-certificate.model';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({

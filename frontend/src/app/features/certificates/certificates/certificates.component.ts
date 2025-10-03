@@ -5,6 +5,10 @@ import { KeycloakService } from '../../../core/keycloak/keycloak.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RevocationReason } from '../models/revocation-reason.model';
+import { DownloadCertificateDTO } from '../models/download-certificate.model';
+import { saveAs } from 'file-saver';
+import {MatButtonModule} from '@angular/material/button';
+import { MatIcon } from "@angular/material/icon";
 
 interface CertificateNode {
   certificate: GetCertificateDto;
@@ -17,7 +21,7 @@ interface CertificateNode {
 @Component({
   selector: 'app-certificates',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatIcon],
   templateUrl: './certificates.component.html',
   styleUrls: ['./certificates.component.css']
 })
@@ -35,6 +39,8 @@ export class CertificatesComponent implements OnInit {
   showRevocationPopup = false;
   revokingCertificateSerial: string | null = null;
   selectedReason: RevocationReason | null = null;
+
+  downloadDto: DownloadCertificateDTO | null = null;
 
   constructor(
     private certificateService: CertificateService,
@@ -159,9 +165,30 @@ export class CertificatesComponent implements OnInit {
   download(serial: string): void {
     this.loading = true;
     this.clearMessages();
-    this.certificateService.downloadCertificate(serial);
     this.success = 'Certificate download initiated';
-    this.loading = false;
+    this.certificateService.downloadCertificate(serial).subscribe({
+      next: (data) => {
+        this.downloadDto = data;
+        const binaryString = atob(data.pkcs12Keystore);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const file = new Blob([bytes], { type: 'application/x-pkcs12' });
+        saveAs(file, `${serial}.p12`);
+        this.loading = false;
+      },
+      error: () => {
+        this.error = 'Failed to download certificate';
+        this.loading = false;
+      }
+    });
+  }
+
+  copyPassword() {
+    if (!this.downloadDto?.keystorePassword) return;
+    navigator.clipboard.writeText(this.downloadDto.keystorePassword);
   }
 
   revoke(serial: string): void {
@@ -205,6 +232,10 @@ export class CertificatesComponent implements OnInit {
 
   closeDetails(): void {
     this.selectedCertificate = null;
+  }
+
+  closeDownload(): void {
+    this.downloadDto = null;
   }
 
   getStatus(cert: GetCertificateDto): string {
