@@ -10,6 +10,7 @@ import java.util.List;
 
 public interface CertificateRepository extends JpaRepository<Certificate,String> {
     List<Certificate> findBySubject(CertificateParty subject);
+    List<Certificate> findByIssuer(CertificateParty issuer);
     Certificate findFirstBySubject(CertificateParty subject);
     List<Certificate> findByTypeIn(List<CertificateType> types);
     Certificate findFirstBySerialNumber(String serialNumber);

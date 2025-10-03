@@ -197,10 +197,11 @@ public class CertificateService {
 
         certificateRepository.save(certificate);
 
-        boolean isCa = Objects.equals(userService.getPrimaryRole(), "ca");
         boolean isUser = Objects.equals(userService.getPrimaryRole(), "user");
-        if((intermediate && isCa) || (!intermediate && (isCa || isUser)))
-        {
+
+        if(!intermediate && isUser){
+            if(user.getOwnedCertificates() == null)
+                user.setOwnedCertificates(new ArrayList<>());
             user.getOwnedCertificates().add(certificate);
             userRepository.save(user);
         }
@@ -602,19 +603,16 @@ public class CertificateService {
         if(certificates.isEmpty())
             throw new IllegalArgumentException("Issuer with ID " + issuer.getId() + " not found");
         Certificate certificate = certificates.get(0);
-        User user = userService.getLoggedUser();
-        if(user.getOwnedCertificates().stream().noneMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
+        if(getAllCaCertificates().stream().noneMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
             throw new IllegalArgumentException("Issuer with ID " + issuer.getId() + " not permitted for logged user");
     }
 
     public List<GetCertificateDTO> getAllCaCertificates() {
-        List<Certificate> certificates;
+        List<Certificate> certificates = new ArrayList<>();
         if(Objects.equals(userService.getPrimaryRole(), "ca")) {
-            certificates = userService.getLoggedUser()
-                    .getOwnedCertificates()
-                    .stream()
-                    .filter(c -> c.getType() != CertificateType.END_ENTITY)
-                    .toList();
+            for(Certificate ownedCertificate:userService.getLoggedUser().getOwnedCertificates()){
+                certificates.addAll(getAllChildCertificates(ownedCertificate));
+            }
         } else {
             certificates = certificateRepository.findByTypeIn(
                     List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE)
@@ -624,6 +622,17 @@ public class CertificateService {
         return certificates.stream()
                 .map(this::mapToGetCertificateDTO)
                 .toList();
+    }
+
+    private List<Certificate> getAllChildCertificates(Certificate parent) {
+        List<Certificate> directChildren = certificateRepository.findByIssuer(parent.getSubject());
+        List<Certificate> allChildren = new ArrayList<>(directChildren);
+
+        for (Certificate child : directChildren) {
+            allChildren.addAll(getAllChildCertificates(child));
+        }
+
+        return allChildren;
     }
 
     public void assignCaUser(AssignCertificateDTO assignCertificateDTO) {
