@@ -1,3 +1,5 @@
+import { ExtendedKeyUsageType } from "./ExtendedKeyUsage";
+
 export interface GetCertificateDto {
   serialNumber: string;
   subjectId: string;
@@ -10,6 +12,8 @@ export interface GetCertificateDto {
   subjectOrganizationalUnit: string;
   subjectCountry: string;
   subjectEmail: string;
+  subjectAlternativeName: string;
+  
 
   // Issuer
   issuerCommonName: string;
@@ -19,6 +23,7 @@ export interface GetCertificateDto {
   issuerOrganizationalUnit: string;
   issuerCountry: string;
   issuerEmail: string;
+  issuerAlternativeName: string;
 
   type: 'ROOT' | 'INTERMEDIATE' | 'END_ENTITY';
 
@@ -28,4 +33,7 @@ export interface GetCertificateDto {
   validTo: string;
 
   revoked: boolean;  
+
+  keyUsages: string[];
+  extendedKeyUsages: string[];
 }

@@ -47,6 +47,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -751,6 +752,7 @@ public class CertificateService {
                 subject != null ? subject.getOrganizationalUnit() : null,
                 subject != null ? subject.getCountry() : null,
                 subject != null ? subject.getEmail() : null,
+                subject != null ? subject.getAlternativeName() : null,
 
                 issuer != null ? issuer.getCommonName() : null,
                 issuer != null ? issuer.getSurname() : null,
@@ -759,12 +761,15 @@ public class CertificateService {
                 issuer != null ? issuer.getOrganizationalUnit() : null,
                 issuer != null ? issuer.getCountry() : null,
                 issuer != null ? issuer.getEmail() : null,
+                issuer != null ? issuer.getAlternativeName() : null,
 
                 certificate.getType(),
                 org != null ? org.getName() : null,
                 certificate.getStartDate(),
                 certificate.getEndDate(),
-                revoked
+                revoked,
+                certificate.getKeyUsages().stream().map(KeyUsageModel::name).collect(Collectors.toSet()),
+                certificate.getExtendedKeyUsages().stream().map(ExtendedKeyUsageModel::name).collect(Collectors.toSet())
         );
     }
 

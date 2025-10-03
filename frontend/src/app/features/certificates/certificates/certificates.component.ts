@@ -9,6 +9,7 @@ import { DownloadCertificateDTO } from '../models/download-certificate.model';
 import { saveAs } from 'file-saver';
 import {MatButtonModule} from '@angular/material/button';
 import { MatIcon } from "@angular/material/icon";
+import { ExtendedKeyUsageType } from '../models/ExtendedKeyUsage';
 
 interface CertificateNode {
   certificate: GetCertificateDto;
@@ -270,5 +271,9 @@ export class CertificatesComponent implements OnInit {
       .replace(/_/g, ' ')
       .toLowerCase()
       .replace(/\b\w/g, char => char.toUpperCase());
+  }
+
+  formatUsage(usages: string[]): string {
+    return usages.join(', ');
   }
 }
