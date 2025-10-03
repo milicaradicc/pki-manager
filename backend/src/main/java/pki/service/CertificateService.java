@@ -48,6 +48,8 @@ import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.*;
 
+import static org.keycloak.utils.StreamsUtil.distinctByKey;
+
 @Service
 @RequiredArgsConstructor
 public class CertificateService {
@@ -147,7 +149,7 @@ public class CertificateService {
         else if (user.getOrganization() != null)
             wrappedKek = user.getOrganization().getWrappedKek();
         else
-            throw new IllegalArgumentException("Logged user does not have an organization");
+            throw new IllegalArgumentException("Logged user does not have an organization"  );
 
         String wrappedDek = keyService.generateWrappedDek(wrappedKek);
         String wrappedPrivateKey = keyService.wrapPrivateKey(keyPair.getPrivate(), wrappedDek, wrappedKek);
@@ -239,8 +241,6 @@ public class CertificateService {
 
 
     public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, GeneralSecurityException, OperatorCreationException {
-        //TODO: add extensions
-        //TODO: decide if this is only for end-entity users
         PemReader pemReader = new PemReader(new StringReader(csrContent));
         byte[] content = pemReader.readPemObject().getContent();
 
@@ -307,6 +307,11 @@ public class CertificateService {
 
         certificateRepository.save(certificate);
         keyStoreReader.downloadCertificate(x509certificate);
+
+        if(user.getOwnedCertificates() == null)
+            user.setOwnedCertificates(new ArrayList<>());
+        user.getOwnedCertificates().add(certificate);
+        userRepository.save(user);
     }
 
     private HashSet<KeyUsageModel> getKeyUsagesFromCsr(PKCS10CertificationRequest csr) {
@@ -614,6 +619,7 @@ public class CertificateService {
             for(Certificate ownedCertificate:userService.getLoggedUser().getOwnedCertificates()){
                 certificates.addAll(getAllChildCertificates(ownedCertificate));
             }
+            certificates.removeIf(c -> c.getType() == CertificateType.END_ENTITY);
         } else {
             certificates = certificateRepository.findByTypeIn(
                     List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE)
@@ -626,14 +632,24 @@ public class CertificateService {
     }
 
     private List<Certificate> getAllChildCertificates(Certificate parent) {
-        List<Certificate> directChildren = certificateRepository.findByIssuer(parent.getSubject());
-        List<Certificate> allChildren = new ArrayList<>(directChildren);
+        return getAllChildCertificates(parent, new HashSet<>());
+    }
 
-        for (Certificate child : directChildren) {
-            allChildren.addAll(getAllChildCertificates(child));
+    private List<Certificate> getAllChildCertificates(Certificate parent, Set<String> visited) {
+        List<Certificate> result = new ArrayList<>();
+
+        if (!visited.add(parent.getSubject().getId())) {
+            return result;
         }
 
-        return allChildren;
+        List<Certificate> directChildren = certificateRepository.findByIssuer(parent.getSubject());
+
+        for (Certificate child : directChildren) {
+            result.add(child);
+            result.addAll(getAllChildCertificates(child, visited));
+        }
+
+        return result;
     }
 
     public void assignCaUser(AssignCertificateDTO assignCertificateDTO) {
@@ -713,29 +729,21 @@ public class CertificateService {
         return keyService.unwrapPrivateKey(wrappedPrivateKey, wrappedDek, wrappedKek);
     }
 
-    public List<GetCertificateDTO> getOwnedCertificates(boolean includeEndEntities) {
+    public List<GetCertificateDTO> getOwnedCertificates() {
         User loggedUser = userService.getLoggedUser();
 
-        List<Certificate> owned = loggedUser.getOwnedCertificates();
+        List<Certificate> owned = new ArrayList<>(loggedUser.getOwnedCertificates());
 
-        List<Certificate> issued = new ArrayList<>();
         if (Objects.equals(userService.getPrimaryRole(), "ca")) {
-            issued = certificateRepository.findByIssuer_Organization(loggedUser.getOrganization());
+            for(Certificate ownedCertificate: loggedUser.getOwnedCertificates()){
+                owned.addAll(getAllChildCertificates(ownedCertificate));
+            }
         }
 
-        Set<Certificate> all = new HashSet<>();
-        if (owned != null) all.addAll(owned);
-        if (issued != null) all.addAll(issued);
-
-        if (!includeEndEntities)
-            return all.stream()
-                    .map(this::mapToGetCertificateDTO)
-                    .toList();
-        else
-            return all.stream()
-                    .filter(c -> c.getType() != CertificateType.END_ENTITY)
-                    .map(this::mapToGetCertificateDTO)
-                    .toList();
+        return owned.stream()
+                .filter(distinctByKey(Certificate::getSerialNumber))
+                .map(this::mapToGetCertificateDTO)
+                .toList();
     }
 
     private GetCertificateDTO mapToGetCertificateDTO(Certificate certificate) {
