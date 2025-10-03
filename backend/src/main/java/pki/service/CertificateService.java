@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pki.dto.*;
 import org.modelmapper.ModelMapper;
+import pki.dto.certificate.DownloadCertificateDTO;
 import pki.model.*;
 import pki.model.Certificate;
 import pki.repository.CertificatePartyRepository;
@@ -69,6 +70,7 @@ public class CertificateService {
     private final RevocationService revocationService;
     private final ModelMapper modelMapper = new ModelMapper();
     private final KeyService keyService;
+    private final ExportService exportService;
 
     @PostConstruct
     private void init() {
@@ -232,7 +234,7 @@ public class CertificateService {
     }
 
 
-    public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, GeneralSecurityException, OperatorCreationException {
+    public DownloadCertificateDTO processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, GeneralSecurityException, OperatorCreationException {
         //TODO: add extensions
         //TODO: decide if this is only for end-entity users
         PemReader pemReader = new PemReader(new StringReader(csrContent));
@@ -299,10 +301,10 @@ public class CertificateService {
                 issuerWrappedKek);
         X509Certificate x509certificate = generateCertificate(certificate, issuerPrivateKey, false);
 
-        //TODO: sent certificate to user (it isn't saved in keystore)
-
         certificateRepository.save(certificate);
         keyStoreReader.downloadCertificate(x509certificate);
+
+        return exportService.exportCertificate(certificate.getSerialNumber());
     }
 
     private HashSet<KeyUsageModel> getKeyUsagesFromCsr(PKCS10CertificationRequest csr) {
@@ -642,17 +644,6 @@ public class CertificateService {
                 .stream()
                 .map(this::mapToGetCertificateDTO)
                 .toList();
-    }
-
-    public boolean checkCertificatePermission(Certificate certificate, List<Certificate> ownedCertificates) {
-        if(ownedCertificates.stream().anyMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
-            return true;
-        if (certificate.getType()==CertificateType.ROOT)
-            return false;
-        Certificate issuerCertificate = certificateRepository.findFirstBySubject(certificate.getIssuer());
-        if(issuerCertificate == null)
-            return false;
-        return checkCertificatePermission(issuerCertificate, ownedCertificates);
     }
 
     @Transactional
