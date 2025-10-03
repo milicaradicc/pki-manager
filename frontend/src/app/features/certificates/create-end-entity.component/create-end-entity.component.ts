@@ -9,10 +9,13 @@ import {Router} from '@angular/router';
 import {CreateIntermediateCertificateDTO} from '../models/create-intermediate-cetrificate-dto.model';
 import {CreateCertificatePartyDTO} from '../models/create-certificate-party.model';
 import {MatSelectModule} from '@angular/material/select';
-import {MatButton} from '@angular/material/button';
+import {MatButton, MatButtonModule} from '@angular/material/button';
 import {CreateEndEntityCertificateDTO} from '../models/create-end-entity-dto.model';
 import { KeycloakService } from '../../../core/keycloak/keycloak.service';
-import {NgForOf} from '@angular/common';
+import {NgForOf, NgIf} from '@angular/common';
+import { saveAs } from 'file-saver';
+import { DownloadCertificateDTO } from '../models/download-certificate.model';
+import { MatIcon } from '@angular/material/icon';
 
 @Component({
   selector: 'app-create-end-entity.component',
@@ -26,7 +29,10 @@ import {NgForOf} from '@angular/common';
     ReactiveFormsModule,
     MatSelectModule,
     MatButton,
+    MatIcon,
+    MatButtonModule,
     NgForOf,
+    NgIf,
   ],
   templateUrl: './create-end-entity.component.html',
   standalone: true,
@@ -39,6 +45,7 @@ export class CreateEndEntityComponent implements OnInit{
   allCertificates:GetCertificateDto[]=[];
   organization:string|undefined;
   isCaUser:boolean = false;
+  downloadDto: DownloadCertificateDTO | null = null;
 
   keyUsageOptions: string[] = [
     'DIGITAL_SIGNATURE',
@@ -118,9 +125,17 @@ export class CreateEndEntityComponent implements OnInit{
         extendedKeyUsages:formValues.extendedKeyUsages
       };
       this.certificateService.createEndEntityCertificate(dto).subscribe({
-        next: () => {
+        next: (data) => {
           this.snackBar.open('Certificate created successfully','OK',{duration:3000});
-          this.router.navigate(['home']);
+          this.downloadDto = data;
+          const binaryString = atob(data.pkcs12Keystore);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const file = new Blob([bytes], { type: 'application/x-pkcs12' });
+          saveAs(file, `${data.serialNumber}.p12`);
         },
        error: (err) => {
           let errorMessage = err?.error || 'Unknown error';
@@ -128,5 +143,14 @@ export class CreateEndEntityComponent implements OnInit{
         }
       });
     }
+  }
+
+
+  copyPassword() {
+    if (!this.downloadDto?.keystorePassword) return;
+    navigator.clipboard.writeText(this.downloadDto.keystorePassword);
+  }
+  closeDownload(): void {
+    this.downloadDto = null;
   }
 }

@@ -45,9 +45,9 @@ public class CertificateController {
 
     @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
     @PostMapping("/end-entity")
-    public ResponseEntity<Void> issueEndEntityCertificate(@RequestBody CreateEndEntityCertificateDTO certificateDTO) throws ParseException, GeneralSecurityException, OperatorCreationException, IOException {
-        certificateService.issueEndEntityCertificate(certificateDTO);
-        return ResponseEntity.ok( null );
+    public ResponseEntity<DownloadCertificateDTO> issueEndEntityCertificate(@RequestBody CreateEndEntityCertificateDTO certificateDTO) throws ParseException, GeneralSecurityException, OperatorCreationException, IOException {
+        DownloadCertificateDTO result = certificateService.issueEndEntityCertificate(certificateDTO);
+        return ResponseEntity.ok(result);
     }
 
     @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")

@@ -115,11 +115,11 @@ public class CertificateService {
         issueNonRootCertificate(certificateDTO, true);
     }
 
-    public void issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
-        issueNonRootCertificate(certificateDTO, false);
+    public DownloadCertificateDTO issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
+        return issueNonRootCertificate(certificateDTO, false);
     }
 
-    private void issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
+    private DownloadCertificateDTO issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
 
@@ -172,7 +172,7 @@ public class CertificateService {
                 .issuer(issuer)
                 .type(intermediate ? CertificateType.INTERMEDIATE : CertificateType.END_ENTITY)
                 .publicKey(keyPair.getPublic())
-                .wrappedPrivateKey(wrappedPrivateKey)
+                .wrappedPrivateKey(!intermediate ? null : wrappedPrivateKey)
                 .wrappedDek(wrappedDek)
                 .startDate(certificateDTO.getStartDate())
                 .endDate(certificateDTO.getEndDate())
@@ -206,7 +206,10 @@ public class CertificateService {
             userRepository.save(user);
         }
 
-        keyStoreReader.downloadCertificate(x509certificate);
+        if (intermediate)
+            return null;
+        else
+            return exportService.exportCertificate(certificate, keyPair.getPrivate());
     }
 
     private HashSet<ExtendedKeyUsageModel> resolveExtendedKeyUsages(List<ExtendedKeyUsageModel> certificateEKUs, Certificate issuerCertificate){
@@ -235,7 +238,7 @@ public class CertificateService {
     }
 
 
-    public DownloadCertificateDTO processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, GeneralSecurityException, OperatorCreationException {
+    public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, GeneralSecurityException, OperatorCreationException {
         //TODO: add extensions
         //TODO: decide if this is only for end-entity users
         PemReader pemReader = new PemReader(new StringReader(csrContent));
@@ -304,8 +307,6 @@ public class CertificateService {
 
         certificateRepository.save(certificate);
         keyStoreReader.downloadCertificate(x509certificate);
-
-        return exportService.exportCertificate(certificate.getSerialNumber());
     }
 
     private HashSet<KeyUsageModel> getKeyUsagesFromCsr(PKCS10CertificationRequest csr) {
