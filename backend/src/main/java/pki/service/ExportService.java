@@ -41,7 +41,12 @@ public class ExportService {
         Certificate certificate = certificateRepository.findFirstBySerialNumber(serialNumber);
         if (certificate == null)
             throw new IllegalArgumentException("Certificate with serial number " + serialNumber + " not found");
-
+        return exportCertificate(certificate, null);
+    }
+    public DownloadCertificateDTO exportCertificate(Certificate certificate) throws GeneralSecurityException, IOException {
+        return exportCertificate(certificate, null);
+    }
+    public DownloadCertificateDTO exportCertificate(Certificate certificate, PrivateKey privateKey) throws GeneralSecurityException, IOException {
         if(!checkCertificateChainValidity(certificate.getSubject(),
                 certificate.getStartDate(), certificate.getEndDate()))
             throw new IllegalArgumentException("Error validating certificate chain");
@@ -56,22 +61,25 @@ public class ExportService {
                 throw new IllegalArgumentException("Forbidden");
         }
 
-        String wrappedKek = (certificate.getUsedAdminKek() != null && certificate.getUsedAdminKek())
-                ? adminWrappedKek
-                : certificate.getOrganization().getWrappedKek();
-        PrivateKey privateKey = keyService.unwrapPrivateKey(certificate.getWrappedPrivateKey(),
-                certificate.getWrappedDek(),
-                wrappedKek);
+        PrivateKey privateKeyExtracted = privateKey;
+        if (certificate.getWrappedPrivateKey() != null && privateKey == null) {
+            String wrappedKek = (certificate.getUsedAdminKek() != null && certificate.getUsedAdminKek())
+                    ? adminWrappedKek
+                    : certificate.getOrganization().getWrappedKek();
+            privateKeyExtracted = keyService.unwrapPrivateKey(certificate.getWrappedPrivateKey(),
+                    certificate.getWrappedDek(),
+                    wrappedKek);
+        }
         String newPassword = generatePassword();
 
         java.security.cert.Certificate[] certificateChain = keyStoreReader.readCertificateChain(
                 keyStoreFilePath, keystorePassword, certificate.getSerialNumber());
 
-        byte[] pkcs12Keystore = KeyStoreExporter.createPkcs12Keystore(privateKey, certificateChain,
+        byte[] pkcs12Keystore = KeyStoreExporter.createPkcs12Keystore(privateKeyExtracted, certificateChain,
                 certificateAlias, newPassword.toCharArray());
         String pkcs12KeystoreBase64 = Base64.getEncoder().encodeToString(pkcs12Keystore);
 
-        return new DownloadCertificateDTO(certificateAlias, newPassword, pkcs12KeystoreBase64);
+        return new DownloadCertificateDTO(certificateAlias, newPassword, pkcs12KeystoreBase64, privateKeyExtracted != null, certificate.getSerialNumber());
     }
 
     private String generatePassword() {

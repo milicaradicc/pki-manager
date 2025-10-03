@@ -315,10 +315,18 @@
       </div>
       <div class="modal-body">
         <div class="download-warning">
+          @if(downloadDto.withPrivateKey) {
           <strong>Warning:</strong> Copy the password below and store it in a safe place. This password will be required to access the keystore and the private key of this certificate. This password will only be shown once.
+          } @else {
+            <strong>Warning:</strong> Copy the password below and store it in a safe place. This password will be required to access the keystore of this certificate. This password will only be shown once.
+          }
         </div>
         <div class="download-info">
-          <strong>Info: The certificate is stored in a PKCS12 keystore, under the alias <span class="alias-display"><strong>{{ downloadDto.alias }}</strong></span>. The keystore and the private key are protected with the password you'll see below.</strong>
+          @if(downloadDto.withPrivateKey) {
+            <strong>Info: The certificate is stored in a PKCS12 keystore, under the alias <span class="alias-display"><strong>{{ downloadDto.alias }}</strong></span>. The keystore and the private key are protected with the password you'll see below.</strong>
+          } @else {
+            <strong>Info: The certificate is stored in a PKCS12 keystore, under the alias <span class="alias-display"><strong>{{ downloadDto.alias }}</strong></span>. The keystore is protected with the password you'll see below.</strong>
+          }
         </div>
         
         <p>Password: <span class="password-display"><strong>{{ downloadDto.keystorePassword }}</strong></span>

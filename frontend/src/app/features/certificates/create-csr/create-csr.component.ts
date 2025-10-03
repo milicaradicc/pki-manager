@@ -8,6 +8,7 @@ import {MatFormField, MatInput, MatLabel} from '@angular/material/input';
 import {MatDatepicker, MatDatepickerInput, MatDatepickerToggle} from '@angular/material/datepicker';
 import {MatButton} from '@angular/material/button';
 import {MatSelectModule} from '@angular/material/select';
+import { MatIcon } from '@angular/material/icon';
 
 @Component({
   imports: [
@@ -20,6 +21,7 @@ import {MatSelectModule} from '@angular/material/select';
     ReactiveFormsModule,
     MatSelectModule,
     MatButton,
+    MatIcon,
   ],
   selector: 'app-create-csr',
   standalone: true,
