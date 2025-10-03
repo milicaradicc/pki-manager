@@ -3,7 +3,11 @@ package pki.service;
 import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.DERIA5String;
+import org.bouncycastle.asn1.pkcs.Attribute;
+import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
@@ -25,6 +29,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import pki.dto.*;
 import org.modelmapper.ModelMapper;
+import pki.dto.certificate.DownloadCertificateDTO;
 import pki.model.*;
 import pki.model.Certificate;
 import pki.repository.CertificatePartyRepository;
@@ -42,6 +47,9 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
+
+import static org.keycloak.utils.StreamsUtil.distinctByKey;
 
 @Service
 @RequiredArgsConstructor
@@ -65,6 +73,7 @@ public class CertificateService {
     private final RevocationService revocationService;
     private final ModelMapper modelMapper = new ModelMapper();
     private final KeyService keyService;
+    private final ExportService exportService;
 
     @PostConstruct
     private void init() {
@@ -102,18 +111,23 @@ public class CertificateService {
         keyStoreWriter.write(serialNumber, keyPair.getPrivate(), password , x509certificate);
         keyStoreWriter.saveKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
 
+        certificate.setKeyUsages(Set.of(KeyUsageModel.KEY_CERT_SIGN, KeyUsageModel.CRL_SIGN));
+
         certificateRepository.save(certificate);
     }
 
+    @Transactional
     public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
         issueNonRootCertificate(certificateDTO, true);
     }
 
-    public void issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
-        issueNonRootCertificate(certificateDTO, false);
+    @Transactional
+    public DownloadCertificateDTO issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
+        return issueNonRootCertificate(certificateDTO, false);
     }
 
-    private void issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
+    @Transactional
+    protected DownloadCertificateDTO issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
 
@@ -141,7 +155,7 @@ public class CertificateService {
         else if (user.getOrganization() != null)
             wrappedKek = user.getOrganization().getWrappedKek();
         else
-            throw new IllegalArgumentException("Logged user does not have an organization");
+            throw new IllegalArgumentException("Logged user does not have an organization"  );
 
         String wrappedDek = keyService.generateWrappedDek(wrappedKek);
         String wrappedPrivateKey = keyService.wrapPrivateKey(keyPair.getPrivate(), wrappedDek, wrappedKek);
@@ -152,18 +166,28 @@ public class CertificateService {
 
         String serialNumber = UUID.randomUUID().toString().replace("-","");
 
+        HashSet<ExtendedKeyUsageModel> extendedKeyUsages = resolveExtendedKeyUsages(certificateDTO.getExtendedKeyUsages(), issuerCertificate);
+        HashSet<KeyUsageModel> keyUsages = new HashSet<>();
+        if(!intermediate && certificateDTO instanceof CreateEndEntityCertificateDTO endEntityDTO){
+            if(endEntityDTO.getKeyUsages() != null && !endEntityDTO.getKeyUsages().isEmpty()){
+                keyUsages.addAll(endEntityDTO.getKeyUsages());
+            }
+        }
+
         Certificate certificate = Certificate.builder()
                 .serialNumber(serialNumber)
                 .subject(subject)
                 .issuer(issuer)
                 .type(intermediate ? CertificateType.INTERMEDIATE : CertificateType.END_ENTITY)
                 .publicKey(keyPair.getPublic())
-                .wrappedPrivateKey(wrappedPrivateKey)
+                .wrappedPrivateKey(!intermediate ? null : wrappedPrivateKey)
                 .wrappedDek(wrappedDek)
                 .startDate(certificateDTO.getStartDate())
                 .endDate(certificateDTO.getEndDate())
                 .organization(user.getOrganization())
                 .usedAdminKek(userService.getPrimaryRole().equals("admin"))
+                .extendedKeyUsages(extendedKeyUsages)
+                .keyUsages(keyUsages)
                 .build();
 
         String issuerWrappedKek = (issuerCertificate.getUsedAdminKek() != null && issuerCertificate.getUsedAdminKek())
@@ -179,20 +203,55 @@ public class CertificateService {
         keyStoreWriter.write(serialNumber, keyPair.getPrivate(), password , x509certificate);
         keyStoreWriter.saveKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
 
+        if(intermediate)
+            certificate.setKeyUsages(Set.of(KeyUsageModel.KEY_CERT_SIGN, KeyUsageModel.CRL_SIGN));
+
         certificateRepository.save(certificate);
 
-        boolean isCa = Objects.equals(userService.getPrimaryRole(), "ca");
         boolean isUser = Objects.equals(userService.getPrimaryRole(), "user");
-        if((intermediate && isCa) || (!intermediate && (isCa || isUser)))
-        {
+
+        if(!intermediate && isUser){
+            if(user.getOwnedCertificates() == null)
+                user.setOwnedCertificates(new ArrayList<>());
             user.getOwnedCertificates().add(certificate);
             userRepository.save(user);
         }
+
+        if (intermediate) {
+            return null;
+        }
+        else
+            return exportService.exportCertificate(certificate, keyPair.getPrivate());
     }
 
+    private HashSet<ExtendedKeyUsageModel> resolveExtendedKeyUsages(List<ExtendedKeyUsageModel> certificateEKUs, Certificate issuerCertificate){
+        HashSet<ExtendedKeyUsageModel> extendedKeyUsages = new HashSet<>();
+
+        if(issuerCertificate.getExtendedKeyUsages()!=null && !issuerCertificate.getExtendedKeyUsages().isEmpty()){
+            if(certificateEKUs == null || certificateEKUs.isEmpty())
+                extendedKeyUsages.addAll(issuerCertificate.getExtendedKeyUsages());
+            else{
+                checkExtendedKeyUsage(issuerCertificate.getExtendedKeyUsages(), certificateEKUs);
+                extendedKeyUsages.addAll(certificateEKUs);
+            }
+        }
+        else{
+            extendedKeyUsages.addAll(certificateEKUs);
+        }
+
+        return extendedKeyUsages;
+    }
+
+    private void checkExtendedKeyUsage(Collection<ExtendedKeyUsageModel> parentUsages, Collection<ExtendedKeyUsageModel> childUsages){
+        for(ExtendedKeyUsageModel usage : childUsages){
+            if(!parentUsages.contains(usage))
+                throw new IllegalArgumentException("Given extended key usage is not allowed by issuer: ");
+        }
+    }
+
+
+    @Transactional
     public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, GeneralSecurityException, OperatorCreationException {
-        //TODO: add extensions
-        //TODO: decide if this is only for end-entity users
         PemReader pemReader = new PemReader(new StringReader(csrContent));
         byte[] content = pemReader.readPemObject().getContent();
 
@@ -220,6 +279,7 @@ public class CertificateService {
         subject.setOrganizationalUnit(getRDNValue(csrSubject, BCStyle.OU));
         subject.setCountry(getRDNValue(csrSubject, BCStyle.C));
         subject.setEmail(getRDNValue(csrSubject, BCStyle.EmailAddress));
+        subject.setAlternativeName(getFirstSubjectAlternativeName(csr));
 
         subject.setId(java.util.UUID.randomUUID().toString());
         subject = certificatePartyRepository.save(subject);
@@ -227,7 +287,11 @@ public class CertificateService {
         User user = userService.getLoggedUser();
         String serialNumber = UUID.randomUUID().toString().replace("-","");
 
-        // TODO: add private key wrapping in case of auto generated key pair
+        HashSet<KeyUsageModel> keyUsages = getKeyUsagesFromCsr(csr);
+        List<ExtendedKeyUsageModel> extendedKeyUsages = getExtendedKeyUsagesFromCsr(csr);
+
+        HashSet<ExtendedKeyUsageModel> resolvedExtendedKeyUsages = resolveExtendedKeyUsages(extendedKeyUsages, issuerCertificate);
+
         Certificate certificate = Certificate.builder()
                 .serialNumber(serialNumber)
                 .subject(subject)
@@ -240,6 +304,8 @@ public class CertificateService {
                 .endDate(endDate)
                 .organization(user.getOrganization())
                 .usedAdminKek(userService.getPrimaryRole().equals("admin"))
+                .extendedKeyUsages(resolvedExtendedKeyUsages)
+                .keyUsages(keyUsages)
                 .build();
 
         String issuerWrappedKek = (issuerCertificate.getUsedAdminKek() != null && issuerCertificate.getUsedAdminKek())
@@ -250,9 +316,117 @@ public class CertificateService {
                 issuerWrappedKek);
         X509Certificate x509certificate = generateCertificate(certificate, issuerPrivateKey, false);
 
-        //TODO: sent certificate to user (it isn't saved in keystore)
+        keyStoreWriter.loadKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
+        keyStoreWriter.write(serialNumber, null, null , x509certificate);
+        keyStoreWriter.saveKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
 
         certificateRepository.save(certificate);
+        keyStoreReader.downloadCertificate(x509certificate);
+
+        if(user.getOwnedCertificates() == null)
+            user.setOwnedCertificates(new ArrayList<>());
+        user.getOwnedCertificates().add(certificate);
+        userRepository.save(user);
+    }
+
+    private HashSet<KeyUsageModel> getKeyUsagesFromCsr(PKCS10CertificationRequest csr) {
+        HashSet<KeyUsageModel> keyUsages = new HashSet<>();
+
+        for (Attribute attr : csr.getAttributes()) {
+            if (attr.getAttrType().equals(PKCSObjectIdentifiers.pkcs_9_at_extensionRequest)) {
+                ASN1Encodable extValue = attr.getAttrValues().getObjectAt(0);
+                Extensions extensions = Extensions.getInstance(extValue);
+
+                Extension keyUsageExt = extensions.getExtension(Extension.keyUsage);
+                if (keyUsageExt != null) {
+                    KeyUsage keyUsage = KeyUsage.getInstance(keyUsageExt.getParsedValue());
+
+                    if (keyUsage.hasUsages(KeyUsage.digitalSignature)) {
+                        keyUsages.add(KeyUsageModel.DIGITAL_SIGNATURE);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.nonRepudiation)) {
+                        keyUsages.add(KeyUsageModel.NON_REPUDIATION);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.keyEncipherment)) {
+                        keyUsages.add(KeyUsageModel.KEY_ENCIPHERMENT);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.dataEncipherment)) {
+                        keyUsages.add(KeyUsageModel.DATA_ENCIPHERMENT);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.keyAgreement)) {
+                        keyUsages.add(KeyUsageModel.KEY_AGREEMENT);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.keyCertSign)) {
+                        keyUsages.add(KeyUsageModel.KEY_CERT_SIGN);
+                    }
+                    if (keyUsage.hasUsages(KeyUsage.cRLSign)) {
+                        keyUsages.add(KeyUsageModel.CRL_SIGN);
+                    }
+                }
+            }
+        }
+        return keyUsages;
+    }
+
+    private List<ExtendedKeyUsageModel> getExtendedKeyUsagesFromCsr(PKCS10CertificationRequest csr) {
+        List<ExtendedKeyUsageModel> extendedKeyUsages = new ArrayList<>();
+
+        for (Attribute attr : csr.getAttributes()) {
+            if (attr.getAttrType().equals(PKCSObjectIdentifiers.pkcs_9_at_extensionRequest)) {
+                ASN1Encodable extValue = attr.getAttrValues().getObjectAt(0);
+                Extensions extensions = Extensions.getInstance(extValue);
+
+                Extension ekuExt = extensions.getExtension(Extension.extendedKeyUsage);
+                if (ekuExt != null) {
+                    ExtendedKeyUsage eku = ExtendedKeyUsage.getInstance(ekuExt.getParsedValue());
+
+                    for (KeyPurposeId purposeId : eku.getUsages()) {
+                        String oid = purposeId.getId();
+                        switch (oid) {
+                            case "1.3.6.1.5.5.7.3.1":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.SERVER_AUTH);
+                                break;
+                            case "1.3.6.1.5.5.7.3.2":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.CLIENT_AUTH);
+                                break;
+                            case "1.3.6.1.5.5.7.3.3":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.CODE_SIGNING);
+                                break;
+                            case "1.3.6.1.5.5.7.3.4":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.EMAIL_PROTECTION);
+                                break;
+                            case "1.3.6.1.5.5.7.3.8":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.TIME_STAMPING);
+                                break;
+                            case "1.3.6.1.5.5.7.3.9":
+                                extendedKeyUsages.add(ExtendedKeyUsageModel.OCSP_SIGNING);
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+        return extendedKeyUsages;
+    }
+
+    private String getFirstSubjectAlternativeName(PKCS10CertificationRequest csr) {
+        for (Attribute attr : csr.getAttributes()) {
+            if (attr.getAttrType().equals(PKCSObjectIdentifiers.pkcs_9_at_extensionRequest)) {
+                ASN1Encodable extValue = attr.getAttrValues().getObjectAt(0);
+                Extensions extensions = Extensions.getInstance(extValue);
+
+                Extension sanExt = extensions.getExtension(Extension.subjectAlternativeName);
+                if (sanExt != null) {
+                    GeneralNames gns = GeneralNames.getInstance(sanExt.getParsedValue());
+                    for (GeneralName gn : gns.getNames()) {
+                        if (gn.getTagNo() == GeneralName.dNSName) {
+                            return DERIA5String.getInstance(gn.getName()).getString();
+                        }
+                    }
+                }
+            }
+        }
+        return null; // no SAN found
     }
 
     private String getRDNValue(X500Name name, ASN1ObjectIdentifier oid) {
@@ -263,13 +437,16 @@ public class CertificateService {
     private X509Certificate generateCertificate(Certificate certificate, PrivateKey issuerPrivateKey, boolean isCa)
             throws CertificateException, OperatorCreationException, CertIOException {
 
-        JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption");
-        builder = builder.setProvider("BC");
+        JcaContentSignerBuilder builder = new JcaContentSignerBuilder("SHA256WithRSAEncryption")
+                .setProvider("BC");
         ContentSigner contentSigner = builder.build(issuerPrivateKey);
 
+        X500Name issuerName = certificate.getIssuer().getX500Name();
+        BigInteger serial = new BigInteger(certificate.getSerialNumber(), 16);
+
         X509v3CertificateBuilder certGen = new JcaX509v3CertificateBuilder(
-                certificate.getIssuer().getX500Name(),
-                new BigInteger(certificate.getSerialNumber(), 16),
+                issuerName,
+                serial,
                 certificate.getStartDate(),
                 certificate.getEndDate(),
                 certificate.getSubject().getX500Name(),
@@ -292,17 +469,58 @@ public class CertificateService {
             certGen.addExtension(
                     Extension.basicConstraints,
                     true,
-                    new BasicConstraints(false) // not a CA
-            );
-
-            certGen.addExtension(
-                    Extension.keyUsage,
-                    true,
-                    new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment)
+                    new BasicConstraints(false)
             );
         }
 
-        String crlDpUrl = getCrlDistributionPointUrl(certificate.getIssuer());
+        if(certificate.getKeyUsages() != null && !certificate.getKeyUsages().isEmpty()){
+            int keyUsageBits = 0;
+            for(KeyUsageModel usage : certificate.getKeyUsages()){
+                keyUsageBits |= mapKeyUsage(usage);
+            }
+            certGen.addExtension(
+                    Extension.keyUsage,
+                    true,
+                    new KeyUsage(keyUsageBits)
+            );
+        }
+
+        if (certificate.getExtendedKeyUsages() != null && !certificate.getExtendedKeyUsages().isEmpty()) {
+            List<KeyPurposeId> usages = new ArrayList<>();
+            for (ExtendedKeyUsageModel usage : certificate.getExtendedKeyUsages()) {
+                usages.add(mapExtendedKeyUsage(usage));
+            }
+            certGen.addExtension(
+                    Extension.extendedKeyUsage,
+                    false,
+                    new ExtendedKeyUsage(usages.toArray(new KeyPurposeId[0]))
+            );
+        }
+
+        if(certificate.getSubject().getAlternativeName()!=null && !certificate.getSubject().getAlternativeName().isEmpty()){
+            GeneralName altName = new GeneralName(GeneralName.dNSName, certificate.getSubject().getAlternativeName());
+            GeneralNames subjectAltName = new GeneralNames(altName);
+            certGen.addExtension(Extension.subjectAlternativeName, false, subjectAltName);
+        }
+
+        if(certificate.getIssuer().getAlternativeName()!=null && !certificate.getIssuer().getAlternativeName().isEmpty()){
+            GeneralName altName = new GeneralName(GeneralName.dNSName, certificate.getIssuer().getAlternativeName());
+            GeneralNames issuerAltName = new GeneralNames(altName);
+            certGen.addExtension(Extension.issuerAlternativeName, false, issuerAltName);
+        }
+
+
+        String crlDpUrl;
+        if (certificate.getType() == CertificateType.ROOT) {
+            crlDpUrl = crlUrl + "/" + certificate.getSerialNumber();
+        } else {
+            Certificate issuerCert = certificateRepository.findFirstBySubject(certificate.getIssuer());
+            if (issuerCert == null) {
+                throw new IllegalArgumentException("Issuer certificate not found for CRL DP");
+            }
+            crlDpUrl = crlUrl + "/" + issuerCert.getSerialNumber();
+        }
+
         DistributionPointName distPoint = new DistributionPointName(
                 new GeneralNames(new GeneralName(GeneralName.uniformResourceIdentifier, crlDpUrl))
         );
@@ -310,11 +528,31 @@ public class CertificateService {
         certGen.addExtension(Extension.cRLDistributionPoints, false, new CRLDistPoint(distPoints));
 
         X509CertificateHolder certHolder = certGen.build(contentSigner);
-
-        JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter();
-        certConverter = certConverter.setProvider("BC");
+        JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter().setProvider("BC");
 
         return certConverter.getCertificate(certHolder);
+    }
+    public int mapKeyUsage(KeyUsageModel model){
+        return switch (model) {
+            case DIGITAL_SIGNATURE -> KeyUsage.digitalSignature;
+            case NON_REPUDIATION -> KeyUsage.nonRepudiation;
+            case KEY_ENCIPHERMENT -> KeyUsage.keyEncipherment;
+            case DATA_ENCIPHERMENT -> KeyUsage.dataEncipherment;
+            case KEY_AGREEMENT -> KeyUsage.keyAgreement;
+            case KEY_CERT_SIGN -> KeyUsage.keyCertSign;
+            case CRL_SIGN -> KeyUsage.cRLSign;
+        };
+    }
+
+    public KeyPurposeId mapExtendedKeyUsage(ExtendedKeyUsageModel model){
+        return switch (model) {
+            case SERVER_AUTH -> KeyPurposeId.id_kp_serverAuth;
+            case CLIENT_AUTH -> KeyPurposeId.id_kp_clientAuth;
+            case CODE_SIGNING -> KeyPurposeId.id_kp_codeSigning;
+            case EMAIL_PROTECTION -> KeyPurposeId.id_kp_emailProtection;
+            case TIME_STAMPING -> KeyPurposeId.id_kp_timeStamping;
+            case OCSP_SIGNING -> KeyPurposeId.id_kp_OCSPSigning;
+        };
     }
 
     boolean checkCertificateChainValidity(CertificateParty issuerParty, Date startDate, Date endDate)
@@ -386,19 +624,17 @@ public class CertificateService {
         if(certificates.isEmpty())
             throw new IllegalArgumentException("Issuer with ID " + issuer.getId() + " not found");
         Certificate certificate = certificates.get(0);
-        User user = userService.getLoggedUser();
-        if(user.getOwnedCertificates().stream().noneMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
+        if(getAllCaCertificates().stream().noneMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
             throw new IllegalArgumentException("Issuer with ID " + issuer.getId() + " not permitted for logged user");
     }
 
     public List<GetCertificateDTO> getAllCaCertificates() {
-        List<Certificate> certificates;
+        List<Certificate> certificates = new ArrayList<>();
         if(Objects.equals(userService.getPrimaryRole(), "ca")) {
-            certificates = userService.getLoggedUser()
-                    .getOwnedCertificates()
-                    .stream()
-                    .filter(c -> c.getType() != CertificateType.END_ENTITY)
-                    .toList();
+            for(Certificate ownedCertificate:userService.getLoggedUser().getOwnedCertificates()){
+                certificates.addAll(getAllChildCertificates(ownedCertificate));
+            }
+            certificates.removeIf(c -> c.getType() == CertificateType.END_ENTITY);
         } else {
             certificates = certificateRepository.findByTypeIn(
                     List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE)
@@ -408,6 +644,27 @@ public class CertificateService {
         return certificates.stream()
                 .map(this::mapToGetCertificateDTO)
                 .toList();
+    }
+
+    private List<Certificate> getAllChildCertificates(Certificate parent) {
+        return getAllChildCertificates(parent, new HashSet<>());
+    }
+
+    private List<Certificate> getAllChildCertificates(Certificate parent, Set<String> visited) {
+        List<Certificate> result = new ArrayList<>();
+
+        if (!visited.add(parent.getSubject().getId())) {
+            return result;
+        }
+
+        List<Certificate> directChildren = certificateRepository.findByIssuer(parent.getSubject());
+
+        for (Certificate child : directChildren) {
+            result.add(child);
+            result.addAll(getAllChildCertificates(child, visited));
+        }
+
+        return result;
     }
 
     public void assignCaUser(AssignCertificateDTO assignCertificateDTO) {
@@ -428,17 +685,6 @@ public class CertificateService {
                 .stream()
                 .map(this::mapToGetCertificateDTO)
                 .toList();
-    }
-
-    public boolean checkCertificatePermission(Certificate certificate, List<Certificate> ownedCertificates) {
-        if(ownedCertificates.stream().anyMatch(c -> c.getSerialNumber().equals(certificate.getSerialNumber())))
-            return true;
-        if (certificate.getType()==CertificateType.ROOT)
-            return false;
-        Certificate issuerCertificate = certificateRepository.findFirstBySubject(certificate.getIssuer());
-        if(issuerCertificate == null)
-            return false;
-        return checkCertificatePermission(issuerCertificate, ownedCertificates);
     }
 
     @Transactional
@@ -498,29 +744,21 @@ public class CertificateService {
         return keyService.unwrapPrivateKey(wrappedPrivateKey, wrappedDek, wrappedKek);
     }
 
-    public List<GetCertificateDTO> getOwnedCertificates(boolean includeEndEntities) {
+    public List<GetCertificateDTO> getOwnedCertificates() {
         User loggedUser = userService.getLoggedUser();
 
-        List<Certificate> owned = loggedUser.getOwnedCertificates();
+        List<Certificate> owned = new ArrayList<>(loggedUser.getOwnedCertificates());
 
-        List<Certificate> issued = new ArrayList<>();
         if (Objects.equals(userService.getPrimaryRole(), "ca")) {
-            issued = certificateRepository.findByIssuer_Organization(loggedUser.getOrganization());
+            for(Certificate ownedCertificate: loggedUser.getOwnedCertificates()){
+                owned.addAll(getAllChildCertificates(ownedCertificate));
+            }
         }
 
-        Set<Certificate> all = new HashSet<>();
-        if (owned != null) all.addAll(owned);
-        if (issued != null) all.addAll(issued);
-
-        if (!includeEndEntities)
-            return all.stream()
-                    .map(this::mapToGetCertificateDTO)
-                    .toList();
-        else
-            return all.stream()
-                    .filter(c -> c.getType() != CertificateType.END_ENTITY)
-                    .map(this::mapToGetCertificateDTO)
-                    .toList();
+        return owned.stream()
+                .filter(distinctByKey(Certificate::getSerialNumber))
+                .map(this::mapToGetCertificateDTO)
+                .toList();
     }
 
     private GetCertificateDTO mapToGetCertificateDTO(Certificate certificate) {
@@ -545,6 +783,7 @@ public class CertificateService {
                 subject != null ? subject.getOrganizationalUnit() : null,
                 subject != null ? subject.getCountry() : null,
                 subject != null ? subject.getEmail() : null,
+                subject != null ? subject.getAlternativeName() : null,
 
                 issuer != null ? issuer.getCommonName() : null,
                 issuer != null ? issuer.getSurname() : null,
@@ -553,30 +792,19 @@ public class CertificateService {
                 issuer != null ? issuer.getOrganizationalUnit() : null,
                 issuer != null ? issuer.getCountry() : null,
                 issuer != null ? issuer.getEmail() : null,
+                issuer != null ? issuer.getAlternativeName() : null,
 
                 certificate.getType(),
                 org != null ? org.getName() : null,
                 certificate.getStartDate(),
                 certificate.getEndDate(),
-                revoked
+                revoked,
+                certificate.getKeyUsages().stream().map(KeyUsageModel::name).collect(Collectors.toSet()),
+                certificate.getExtendedKeyUsages().stream().map(ExtendedKeyUsageModel::name).collect(Collectors.toSet())
         );
     }
 
     public Certificate getCertificateBySerialNumber(String serialNumber) {
         return certificateRepository.findFirstBySerialNumber(serialNumber);
-    }
-
-    public List<Certificate> getAllCACertificates() {
-        return certificateRepository.findByTypeIn(
-                List.of(CertificateType.ROOT, CertificateType.INTERMEDIATE)
-        );
-    }
-
-    private String getCrlDistributionPointUrl(CertificateParty issuerParty) {
-        Certificate issuerCert = certificateRepository.findFirstBySubject(issuerParty);
-        if (issuerCert == null) {
-            throw new IllegalArgumentException("Issuer certificate not found for CRL DP");
-        }
-        return crlUrl + "/" + issuerCert.getSerialNumber();
     }
 }

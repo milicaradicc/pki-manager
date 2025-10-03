@@ -13,4 +13,6 @@ public class DownloadCertificateDTO {
     private String alias;
     private String keystorePassword;
     private String pkcs12Keystore;
+    private boolean withPrivateKey;
+    private String serialNumber;
 }

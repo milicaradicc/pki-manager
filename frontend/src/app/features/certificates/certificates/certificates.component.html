@@ -199,6 +199,10 @@
               <label>Country:</label>
               <span>{{ selectedCertificate.subjectCountry || '-' }}</span>
             </div>
+            <div class="detail-item">
+              <label>Alternative Name:</label>
+              <span>{{ selectedCertificate.subjectAlternativeName || '-' }}</span>
+            </div>
           </div>
         </div>
 
@@ -233,6 +237,10 @@
               <label>Country:</label>
               <span>{{ selectedCertificate.issuerCountry || '-' }}</span>
             </div>
+            <div class="detail-item">
+              <label>Alternative Name:</label>
+              <span>{{ selectedCertificate.issuerAlternativeName || '-' }}</span>
+            </div>
           </div>
         </div>
 
@@ -246,6 +254,20 @@
             <div class="detail-item">
               <label>Valid To:</label>
               <span>{{ selectedCertificate.validTo | date:'full' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3>Extentions</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Key Usages:</label>
+              <span>{{ formatUsage(selectedCertificate.keyUsages) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Extended Key Usages:</label>
+              <span>{{ formatUsage(selectedCertificate.extendedKeyUsages) }}</span>
             </div>
           </div>
         </div>
@@ -315,10 +337,18 @@
       </div>
       <div class="modal-body">
         <div class="download-warning">
+          @if(downloadDto.withPrivateKey) {
           <strong>Warning:</strong> Copy the password below and store it in a safe place. This password will be required to access the keystore and the private key of this certificate. This password will only be shown once.
+          } @else {
+            <strong>Warning:</strong> Copy the password below and store it in a safe place. This password will be required to access the keystore of this certificate. This password will only be shown once.
+          }
         </div>
         <div class="download-info">
-          <strong>Info: The certificate is stored in a PKCS12 keystore, under the alias <span class="alias-display"><strong>{{ downloadDto.alias }}</strong></span>. The keystore and the private key are protected with the password you'll see below.</strong>
+          @if(downloadDto.withPrivateKey) {
+            <strong>Info: The certificate is stored in a PKCS12 keystore, under the alias <span class="alias-display"><strong>{{ downloadDto.alias }}</strong></span>. The keystore and the private key are protected with the password you'll see below.</strong>
+          } @else {
+            <strong>Info: The certificate is stored in a PKCS12 keystore, under the alias <span class="alias-display"><strong>{{ downloadDto.alias }}</strong></span>. The keystore is protected with the password you'll see below.</strong>
+          }
         </div>
         
         <p>Password: <span class="password-display"><strong>{{ downloadDto.keystorePassword }}</strong></span>

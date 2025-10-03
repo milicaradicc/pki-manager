@@ -25,8 +25,8 @@ export class CertificateService {
     return this.http.post<void>(`${this.baseUrl}/intermediate`, dto);
   }
 
-  createEndEntityCertificate(dto: CreateEndEntityCertificateDTO): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/end-entity`, dto);
+  createEndEntityCertificate(dto: CreateEndEntityCertificateDTO): Observable<DownloadCertificateDTO> {
+    return this.http.post<DownloadCertificateDTO>(`${this.baseUrl}/end-entity`, dto);
   }
 
   sendCSR(formData: FormData): Observable<void> {

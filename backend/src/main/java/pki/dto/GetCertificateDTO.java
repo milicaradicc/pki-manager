@@ -4,8 +4,11 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import pki.model.CertificateType;
+import pki.model.ExtendedKeyUsageModel;
+import pki.model.KeyUsageModel;
 
 import java.util.Date;
+import java.util.Set;
 
 @Data
 @NoArgsConstructor
@@ -22,6 +25,7 @@ public class GetCertificateDTO {
     private String subjectOrganizationalUnit;
     private String subjectCountry;
     private String subjectEmail;
+    private String subjectAlternativeName;
 
     // CertificateParty issuer
     private String issuerCommonName;
@@ -31,6 +35,7 @@ public class GetCertificateDTO {
     private String issuerOrganizationalUnit;
     private String issuerCountry;
     private String issuerEmail;
+    private String issuerAlternativeName;
 
     private CertificateType type;
 
@@ -41,4 +46,8 @@ public class GetCertificateDTO {
     private Date validTo;
 
     private boolean revoked;
+
+    private Set<String> keyUsages;
+    private Set<String> extendedKeyUsages;
+
 }

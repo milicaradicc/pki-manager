@@ -12,6 +12,7 @@ import {GetCertificateDto} from '../models/get-certificate-dto.model';
 import {CreateIntermediateCertificateDTO} from '../models/create-intermediate-cetrificate-dto.model';
 import { KeycloakService } from '../../../core/keycloak/keycloak.service';
 import { provideNativeDateAdapter } from '@angular/material/core';
+import {NgForOf} from '@angular/common';
 
 
 @Component({
@@ -25,6 +26,7 @@ import { provideNativeDateAdapter } from '@angular/material/core';
     MatLabel,
     ReactiveFormsModule,
     MatSelectModule,
+    NgForOf,
   ],
   templateUrl:'./create-intermediate.component.html',
   standalone: true,
@@ -38,6 +40,15 @@ export class CreateIntermediateComponent implements OnInit {
   allCertificates:GetCertificateDto[]=[];
   organization:string|undefined;
   isCaUser:boolean = false;
+
+  extendedKeyUsageOptions: string[] = [
+    'SERVER_AUTH',
+    'CLIENT_AUTH',
+    'CODE_SIGNING',
+    'EMAIL_PROTECTION',
+    'TIME_STAMPING',
+    'OCSP_SIGNING'
+  ];
 
   constructor(private fb: FormBuilder,
               private certificateService: CertificateService,
@@ -60,6 +71,8 @@ export class CreateIntermediateComponent implements OnInit {
       email: ['', [Validators.required, Validators.email]],
       startDate: ['', Validators.required],
       endDate: ['', Validators.required],
+      extendedKeyUsages: [[]],
+      alternativeName: [''],
     });
 
     this.certificateService.getAllCaCertificates().subscribe({
@@ -85,9 +98,11 @@ export class CreateIntermediateComponent implements OnInit {
           organizationalUnit: formValues.organizationalUnit,
           country: formValues.country,
           email: formValues.email,
+          alternativeName:formValues.alternativeName
         } as CreateCertificatePartyDTO,
         startDate: (new Date(formValues.startDate.getTime() - formValues.startDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0],
         endDate: (new Date(formValues.endDate.getTime() - formValues.endDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0],
+        extendedKeyUsages : formValues.extendedKeyUsages
       };
       console.log(dto);
       this.certificateService.createIntermediateCertificate(dto).subscribe({

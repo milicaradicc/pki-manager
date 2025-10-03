@@ -9,9 +9,13 @@ import {Router} from '@angular/router';
 import {CreateIntermediateCertificateDTO} from '../models/create-intermediate-cetrificate-dto.model';
 import {CreateCertificatePartyDTO} from '../models/create-certificate-party.model';
 import {MatSelectModule} from '@angular/material/select';
-import {MatButton} from '@angular/material/button';
+import {MatButton, MatButtonModule} from '@angular/material/button';
 import {CreateEndEntityCertificateDTO} from '../models/create-end-entity-dto.model';
 import { KeycloakService } from '../../../core/keycloak/keycloak.service';
+import {NgForOf, NgIf} from '@angular/common';
+import { saveAs } from 'file-saver';
+import { DownloadCertificateDTO } from '../models/download-certificate.model';
+import { MatIcon } from '@angular/material/icon';
 
 @Component({
   selector: 'app-create-end-entity.component',
@@ -25,6 +29,10 @@ import { KeycloakService } from '../../../core/keycloak/keycloak.service';
     ReactiveFormsModule,
     MatSelectModule,
     MatButton,
+    MatIcon,
+    MatButtonModule,
+    NgForOf,
+    NgIf,
   ],
   templateUrl: './create-end-entity.component.html',
   standalone: true,
@@ -37,6 +45,28 @@ export class CreateEndEntityComponent implements OnInit{
   allCertificates:GetCertificateDto[]=[];
   organization:string|undefined;
   isCaUser:boolean = false;
+  downloadDto: DownloadCertificateDTO | null = null;
+
+  keyUsageOptions: string[] = [
+    'DIGITAL_SIGNATURE',
+    'NON_REPUDIATION',
+    'KEY_ENCIPHERMENT',
+    'DATA_ENCIPHERMENT',
+    'KEY_AGREEMENT',
+    'KEY_CERT_SIGN',
+    'CRL_SIGN',
+    'ENCIPHER_ONLY',
+    'DECIPHER_ONLY'
+  ];
+
+  extendedKeyUsageOptions: string[] = [
+    'SERVER_AUTH',
+    'CLIENT_AUTH',
+    'CODE_SIGNING',
+    'EMAIL_PROTECTION',
+    'TIME_STAMPING',
+    'OCSP_SIGNING'
+  ];
 
   constructor(private fb: FormBuilder,
               private certificateService: CertificateService,
@@ -59,6 +89,9 @@ export class CreateEndEntityComponent implements OnInit{
       email: ['', [Validators.required, Validators.email]],
       startDate: ['', Validators.required],
       endDate: ['', Validators.required],
+      keyUsages:[[]],
+      extendedKeyUsages:[[]],
+      alternativeName:['']
     });
 
     this.certificateService.getAllCaCertificates().subscribe({
@@ -84,14 +117,25 @@ export class CreateEndEntityComponent implements OnInit{
           organizationalUnit: formValues.organizationalUnit,
           country: formValues.country,
           email: formValues.email,
+          alternativeName:formValues.alternativeName
         } as CreateCertificatePartyDTO,
         startDate: (new Date(formValues.startDate.getTime() - formValues.startDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0],
         endDate: (new Date(formValues.endDate.getTime() - formValues.endDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0],
+        keyUsages:formValues.keyUsages,
+        extendedKeyUsages:formValues.extendedKeyUsages
       };
       this.certificateService.createEndEntityCertificate(dto).subscribe({
-        next: () => {
+        next: (data) => {
           this.snackBar.open('Certificate created successfully','OK',{duration:3000});
-          this.router.navigate(['home']);
+          this.downloadDto = data;
+          const binaryString = atob(data.pkcs12Keystore);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const file = new Blob([bytes], { type: 'application/x-pkcs12' });
+          saveAs(file, `${data.serialNumber}.p12`);
         },
        error: (err) => {
           let errorMessage = err?.error || 'Unknown error';
@@ -99,5 +143,14 @@ export class CreateEndEntityComponent implements OnInit{
         }
       });
     }
+  }
+
+
+  copyPassword() {
+    if (!this.downloadDto?.keystorePassword) return;
+    navigator.clipboard.writeText(this.downloadDto.keystorePassword);
+  }
+  closeDownload(): void {
+    this.downloadDto = null;
   }
 }

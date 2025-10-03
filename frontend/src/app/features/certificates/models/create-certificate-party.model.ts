@@ -6,4 +6,5 @@ export interface CreateCertificatePartyDTO {
   organizationalUnit:string;
   country:string;
   email:string;
+  alternativeName:string;
 }

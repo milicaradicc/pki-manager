@@ -9,6 +9,7 @@ import { DownloadCertificateDTO } from '../models/download-certificate.model';
 import { saveAs } from 'file-saver';
 import {MatButtonModule} from '@angular/material/button';
 import { MatIcon } from "@angular/material/icon";
+import { ExtendedKeyUsageType } from '../models/ExtendedKeyUsage';
 
 interface CertificateNode {
   certificate: GetCertificateDto;
@@ -60,7 +61,7 @@ export class CertificatesComponent implements OnInit {
     if (this.role === 'admin') {
       obs$ = this.certificateService.getAllCertificates();
     } else if (this.role === 'ca') {
-      obs$ = this.certificateService.getAllCaCertificates();
+      obs$ = this.certificateService.getOwnedCertificates();
     } else {
       obs$ = this.certificateService.getOwnedCertificates();
     }
@@ -145,12 +146,12 @@ export class CertificatesComponent implements OnInit {
   canCreateCertificate(node: CertificateNode): boolean {
     // Cannot create if this cert or any parent is revoked
     if (node.hasRevokedParent) return false;
-    
+
     // Cannot create if this cert is expired
     const now = new Date();
     const validTo = new Date(node.certificate.validTo);
     if (now > validTo) return false;
-    
+
     // Only ROOT and INTERMEDIATE can issue certificates
     return node.certificate.type === 'ROOT' || node.certificate.type === 'INTERMEDIATE';
   }
@@ -243,7 +244,7 @@ export class CertificatesComponent implements OnInit {
     const now = new Date();
     const validFrom = new Date(cert.validFrom);
     const validTo = new Date(cert.validTo);
-    
+
     if (now < validFrom) return 'Not Yet Valid';
     if (now > validTo) return 'Expired';
     return 'Valid';
@@ -254,7 +255,7 @@ export class CertificatesComponent implements OnInit {
     const now = new Date();
     const validFrom = new Date(cert.validFrom);
     const validTo = new Date(cert.validTo);
-    
+
     if (now < validFrom) return 'status-pending';
     if (now > validTo) return 'status-expired';
     return 'status-valid';
@@ -270,5 +271,9 @@ export class CertificatesComponent implements OnInit {
       .replace(/_/g, ' ')
       .toLowerCase()
       .replace(/\b\w/g, char => char.toUpperCase());
+  }
+
+  formatUsage(usages: string[]): string {
+    return usages.join(', ');
   }
 }

@@ -13,4 +13,5 @@ public class CreateCertificatePartyDTO {
     private String organizationalUnit;
     private String country;
     private String email;
+    private String alternativeName;
 }

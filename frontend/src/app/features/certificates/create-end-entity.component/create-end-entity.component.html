@@ -49,6 +49,11 @@
         <input matInput type="email" formControlName="email">
       </mat-form-field>
 
+      <mat-form-field appearance="outline">
+        <mat-label>Alternative name</mat-label>
+        <input matInput formControlName="alternativeName">
+      </mat-form-field>
+
       <mat-form-field>
         <mat-label>Start Date</mat-label>
         <input [min]="today" formControlName="startDate" matInput [matDatepicker]="picker1">
@@ -63,6 +68,24 @@
         <mat-datepicker #picker2></mat-datepicker>
       </mat-form-field>
 
+      <mat-form-field appearance="fill" class="w-full mt-4">
+        <mat-label>Key Usages</mat-label>
+        <mat-select formControlName="keyUsages" multiple>
+          <mat-option *ngFor="let usage of keyUsageOptions" [value]="usage">
+            {{ usage }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill" class="w-full mt-4">
+        <mat-label>Extended Key Usages</mat-label>
+        <mat-select formControlName="extendedKeyUsages" multiple>
+          <mat-option *ngFor="let usage of extendedKeyUsageOptions" [value]="usage">
+            {{ usage }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
       <button mat-flat-button color="primary" class="submit-btn"
               (click)="save()"
               [disabled]="!createForm.valid">
@@ -71,3 +94,31 @@
     </form>
   </div>
 </div>
+<div *ngIf="downloadDto" class="modal-overlay" (click)="closeDownload()">
+    <div class="modal-content modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Keystore Password</h2>
+      </div>
+      <div class="modal-body">
+        <div class="download-warning">
+          <strong>Warning:</strong> Copy the password below and store it in a safe place. This password will be required to access the keystore and the private key of this certificate. This password will only be shown once. The private key will not be present in future downloads.
+        </div>
+        <div class="download-info">
+          <strong>Info: The certificate is stored in a PKCS12 keystore, under the alias <span class="alias-display"><strong>{{ downloadDto.alias }}</strong></span>. The keystore and the private key are protected with the password you'll see below.</strong>
+        </div>
+        
+        <p>Password: <span class="password-display"><strong>{{ downloadDto.keystorePassword }}</strong></span>
+          <button matIconButton="icon" aria-label="Copy Password" matTooltip="Copy Password" (click)="copyPassword()" class="copy-btn">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button 
+          class="btn btn-secondary" 
+          (click)="closeDownload()">
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
