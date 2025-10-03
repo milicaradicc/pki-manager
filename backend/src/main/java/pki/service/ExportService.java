@@ -54,7 +54,9 @@ public class ExportService {
                 throw new IllegalArgumentException("Forbidden");
         }
 
-        String wrappedKek = certificate.getOrganization() != null ? certificate.getOrganization().getWrappedKek() : adminWrappedKek;
+        String wrappedKek = (certificate.getUsedAdminKek() != null && certificate.getUsedAdminKek())
+                ? adminWrappedKek
+                : certificate.getOrganization().getWrappedKek();
         PrivateKey privateKey = keyService.unwrapPrivateKey(certificate.getWrappedPrivateKey(),
                 certificate.getWrappedDek(),
                 wrappedKek);
