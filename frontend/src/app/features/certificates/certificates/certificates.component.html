@@ -125,7 +125,7 @@
               <button 
                 class="btn btn-secondary btn-sm" 
                 (click)="download(node.certificate.serialNumber)"
-                [disabled]="loading"
+                [disabled]="node.certificate.revoked || loading"
                 title="Download Certificate">
                 Download
               </button>
@@ -252,7 +252,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" (click)="closeDetails()">Close</button>
-        <button class="btn btn-primary" (click)="download(selectedCertificate.serialNumber)">
+        <button class="btn btn-primary" (click)="download(selectedCertificate.serialNumber)" [disabled]="selectedCertificate.revoked">
           Download Certificate
         </button>
       </div>
@@ -302,6 +302,37 @@
           (click)="confirmRevocation()"
           [disabled]="!selectedReason || loading">
           Confirm Revocation
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Download Modal -->
+  <div *ngIf="downloadDto" class="modal-overlay" (click)="closeDownload()">
+    <div class="modal-content modal-small" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Keystore Password</h2>
+      </div>
+      <div class="modal-body">
+        <div class="download-warning">
+          <strong>Warning:</strong> Copy the password below and store it in a safe place. This password will be required to access the keystore and the private key of this certificate. This password will only be shown once.
+        </div>
+        <div class="download-info">
+          <strong>Info: The certificate is stored in a PKCS12 keystore, under the alias <span class="alias-display"><strong>{{ downloadDto.alias }}</strong></span>. The keystore and the private key are protected with the password you'll see below.</strong>
+        </div>
+        
+        <p>Password: <span class="password-display"><strong>{{ downloadDto.keystorePassword }}</strong></span>
+          <button matIconButton="icon" aria-label="Copy Password" matTooltip="Copy Password" (click)="copyPassword()" class="copy-btn">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button 
+          class="btn btn-secondary" 
+          (click)="closeDownload()"
+          [disabled]="loading">
+          Confirm
         </button>
       </div>
     </div>

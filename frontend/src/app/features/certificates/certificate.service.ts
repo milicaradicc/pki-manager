@@ -1,11 +1,12 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import {HttpClient} from '@angular/common/http';
+import {Observable} from 'rxjs';
+import {CreateRootCertificateDTO} from './models/create-root-certificate-dto.model';
+import {GetCertificateDto} from './models/get-certificate-dto.model';
+import {CreateIntermediateCertificateDTO} from './models/create-intermediate-cetrificate-dto.model';
 import { environment } from '../../../environments/environment';
-import { CreateRootCertificateDTO } from './models/create-root-certificate-dto.model';
-import { GetCertificateDto } from './models/get-certificate-dto.model';
-import { AssignCertificateDTO } from './models/assign-certificate.dto';
-import { CreateIntermediateCertificateDTO } from './models/create-intermediate-cetrificate-dto.model';
+import { AssignCertificateDTO } from './models/assign-certificate.model';
+import { DownloadCertificateDTO } from './models/download-certificate.model';
 import { CreateEndEntityCertificateDTO } from './models/create-end-entity-dto.model';
 
 @Injectable({
@@ -40,19 +41,19 @@ export class CertificateService {
     return this.http.get<GetCertificateDto[]>(this.baseUrl);
   }
 
-  getOwnedCertificates(): Observable<GetCertificateDto[]> {
-    return this.http.get<GetCertificateDto[]>(`${this.baseUrl}/owned`);
+  getOwnedCertificates(includeEndEntity: boolean = true): Observable<GetCertificateDto[]> {
+    return this.http.get<GetCertificateDto[]>(`${this.baseUrl}/owned?includeEndEntity=${includeEndEntity}`);
   }
 
   assignCertificate(dto: AssignCertificateDTO): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/assign-ca-user`, dto);
   }
 
-  downloadCertificate(serial: string): void {
-    window.open(`${this.baseUrl}/${serial}/download`, '_blank');
-  }
-
   revokeCertificate(serial: string, reason: string): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/${serial}/revoke`, { reason });
+  }
+
+  downloadCertificate(serialNumber:string): Observable<DownloadCertificateDTO> {
+    return this.http.get<DownloadCertificateDTO>(`${this.baseUrl}/${serialNumber}/download`);
   }
 }
