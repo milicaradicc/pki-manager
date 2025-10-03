@@ -199,6 +199,10 @@
               <label>Country:</label>
               <span>{{ selectedCertificate.subjectCountry || '-' }}</span>
             </div>
+            <div class="detail-item">
+              <label>Alternative Name:</label>
+              <span>{{ selectedCertificate.subjectAlternativeName || '-' }}</span>
+            </div>
           </div>
         </div>
 
@@ -233,6 +237,10 @@
               <label>Country:</label>
               <span>{{ selectedCertificate.issuerCountry || '-' }}</span>
             </div>
+            <div class="detail-item">
+              <label>Alternative Name:</label>
+              <span>{{ selectedCertificate.issuerAlternativeName || '-' }}</span>
+            </div>
           </div>
         </div>
 
@@ -246,6 +254,20 @@
             <div class="detail-item">
               <label>Valid To:</label>
               <span>{{ selectedCertificate.validTo | date:'full' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3>Extentions</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Key Usages:</label>
+              <span>{{ formatUsage(selectedCertificate.keyUsages) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Extended Key Usages:</label>
+              <span>{{ formatUsage(selectedCertificate.extendedKeyUsages) }}</span>
             </div>
           </div>
         </div>

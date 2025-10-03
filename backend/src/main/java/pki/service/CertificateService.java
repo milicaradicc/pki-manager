@@ -47,6 +47,7 @@ import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.keycloak.utils.StreamsUtil.distinctByKey;
 
@@ -113,15 +114,18 @@ public class CertificateService {
         certificateRepository.save(certificate);
     }
 
+    @Transactional
     public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
         issueNonRootCertificate(certificateDTO, true);
     }
 
+    @Transactional
     public DownloadCertificateDTO issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
         return issueNonRootCertificate(certificateDTO, false);
     }
 
-    private DownloadCertificateDTO issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
+    @Transactional
+    protected DownloadCertificateDTO issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
 
@@ -240,6 +244,7 @@ public class CertificateService {
     }
 
 
+    @Transactional
     public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, GeneralSecurityException, OperatorCreationException {
         PemReader pemReader = new PemReader(new StringReader(csrContent));
         byte[] content = pemReader.readPemObject().getContent();
@@ -304,6 +309,10 @@ public class CertificateService {
                 issuerCertificate.getWrappedDek(),
                 issuerWrappedKek);
         X509Certificate x509certificate = generateCertificate(certificate, issuerPrivateKey, false);
+
+        keyStoreWriter.loadKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
+        keyStoreWriter.write(serialNumber, null, null , x509certificate);
+        keyStoreWriter.saveKeyStore(keyStoreFilePath,  keystorePassword.toCharArray());
 
         certificateRepository.save(certificate);
         keyStoreReader.downloadCertificate(x509certificate);
@@ -768,6 +777,7 @@ public class CertificateService {
                 subject != null ? subject.getOrganizationalUnit() : null,
                 subject != null ? subject.getCountry() : null,
                 subject != null ? subject.getEmail() : null,
+                subject != null ? subject.getAlternativeName() : null,
 
                 issuer != null ? issuer.getCommonName() : null,
                 issuer != null ? issuer.getSurname() : null,
@@ -776,12 +786,15 @@ public class CertificateService {
                 issuer != null ? issuer.getOrganizationalUnit() : null,
                 issuer != null ? issuer.getCountry() : null,
                 issuer != null ? issuer.getEmail() : null,
+                issuer != null ? issuer.getAlternativeName() : null,
 
                 certificate.getType(),
                 org != null ? org.getName() : null,
                 certificate.getStartDate(),
                 certificate.getEndDate(),
-                revoked
+                revoked,
+                certificate.getKeyUsages().stream().map(KeyUsageModel::name).collect(Collectors.toSet()),
+                certificate.getExtendedKeyUsages().stream().map(ExtendedKeyUsageModel::name).collect(Collectors.toSet())
         );
     }
 
