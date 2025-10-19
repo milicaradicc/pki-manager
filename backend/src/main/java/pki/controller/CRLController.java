@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import pki.service.RevocationService;
 
 @RestController
-@RequestMapping("/api/crl")
+@RequestMapping("/crl")
 public class CRLController {
 
     private RevocationService revocationService;

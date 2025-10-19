@@ -36,7 +36,7 @@ export class Interceptor implements HttpInterceptor {
       }),
       catchError(err => {
         console.error('Token refresh failed', err);
-        this.keycloak.logout(); // korisnik se izloguje ako je refresh token istekao
+        // this.keycloak.logout(); // korisnik se izloguje ako je refresh token istekao
         return throwError(() => err);
       })
     );

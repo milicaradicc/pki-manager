@@ -5,7 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
@@ -26,33 +26,66 @@ public class JwtUserFilter extends OncePerRequestFilter {
     private final OrganizationService organizationService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        try {
-            JwtAuthenticationToken token = (JwtAuthenticationToken) SecurityContextHolder.getContext().getAuthentication();
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        // Preskači filter za javne endpoint-e
+        return path.startsWith("/api/crl/") ||
+                path.startsWith("/crl/") ||
+                path.equals("/user/home");
+    }
 
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+            // Proveri da li je autentifikacija JwtAuthenticationToken
+            if (!(authentication instanceof JwtAuthenticationToken)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
             String email = String.valueOf(token.getTokenAttributes().get("email"));
+
+            // Proveri da li email postoji i nije "null"
+            if (email == null || email.equals("null") || email.isEmpty()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             User user = this.userService.findUserByEmail(email);
 
-            // new user detected, save data
+            // Novi korisnik detektovan, sačuvaj podatke
             if (user == null) {
                 String keycloakId = String.valueOf(token.getTokenAttributes().get("sub"));
                 String firstname = String.valueOf(token.getTokenAttributes().get("given_name"));
                 String lastname = String.valueOf(token.getTokenAttributes().get("family_name"));
                 String organizationName = String.valueOf(token.getTokenAttributes().get("organization"));
-                Organization organization;
-                if (organizationName == null || organizationName.isEmpty() || organizationName.equals("null"))
-                    organization = null;
-                if (organizationService.exists(organizationName))
-                    organization = organizationService.getByName(organizationName);
-                else
-                    organization = organizationService.create(new CreateOrganizationDTO(organizationName));
+
+                Organization organization = null;
+
+                if (organizationName != null && !organizationName.isEmpty() && !organizationName.equals("null")) {
+                    if (organizationService.exists(organizationName)) {
+                        organization = organizationService.getByName(organizationName);
+                    } else {
+                        organization = organizationService.create(new CreateOrganizationDTO(organizationName));
+                    }
+                }
+
                 this.userService.save(new User(null, keycloakId, email, firstname, lastname, organization, new ArrayList<>()));
             }
+        } catch (ClassCastException e) {
+            // Autentifikacija nije JWT tip, nastavi dalje
+            filterChain.doFilter(request, response);
+            return;
         } catch (Exception e) {
-            throw new IllegalArgumentException("Unable to save user");
+            // Loguj grešku za debugging
+            logger.error("Error saving user from JWT token", e);
+            throw new IllegalArgumentException("Unable to save user", e);
         }
 
         filterChain.doFilter(request, response);
     }
 }
-

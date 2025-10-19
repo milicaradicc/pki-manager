@@ -46,6 +46,8 @@ public class BasicSecurityConfig {
 
         http.authorizeHttpRequests((requests) -> requests
                 .requestMatchers(HttpMethod.GET, "/user/home").permitAll()
+                .requestMatchers("/api/crl/**").permitAll()
+                .requestMatchers("/crl/**").permitAll()
                 .anyRequest().authenticated()
         );
 

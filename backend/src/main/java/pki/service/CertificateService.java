@@ -3,6 +3,7 @@ package pki.service;
 import jakarta.annotation.PostConstruct;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.DERIA5String;
@@ -50,7 +51,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.keycloak.utils.StreamsUtil.distinctByKey;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CertificateService {
@@ -251,9 +252,10 @@ public class CertificateService {
     }
 
     private void checkExtendedKeyUsage(Collection<ExtendedKeyUsageModel> parentUsages, Collection<ExtendedKeyUsageModel> childUsages){
-        for(ExtendedKeyUsageModel usage : childUsages){
-            if(!parentUsages.contains(usage))
-                throw new IllegalArgumentException("Certificate issuance denied: one or more certificates in the chain are revoked");
+        for(ExtendedKeyUsageModel usage : childUsages) {
+            if (!parentUsages.contains(usage)) {
+                throw new IllegalArgumentException("KU check failed");
+            }
         }
     }
 

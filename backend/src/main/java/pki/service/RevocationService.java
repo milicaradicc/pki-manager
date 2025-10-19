@@ -72,16 +72,11 @@ public class RevocationService {
             Path crlPath = Paths.get(crlDirectory);
             if (!Files.exists(crlPath)) {
                 Files.createDirectories(crlPath);
-                log.info("Created CRL directory: {}", crlDirectory);
             }
         } catch (IOException e) {
             log.error("Failed to create CRL directory", e);
         }
     }
-
-    // =========================
-    // CERTIFICATE REVOCATION
-    // =========================
 
     public void revokeCertificate(String serialNumber, RevocationReason reason) {
         Certificate cert = certificateRepository.findFirstBySerialNumber(serialNumber);
@@ -98,7 +93,6 @@ public class RevocationService {
 
         revokedCertificateRepository.save(revoked);
 
-        // Invalidate cache i regeneriši CRL za issuera
         Certificate issuerCert = certificateRepository.findFirstBySubject(cert.getIssuer());
         if (issuerCert != null) {
             crlCache.remove(issuerCert.getSerialNumber());
@@ -146,6 +140,11 @@ public class RevocationService {
         ASN1Primitive cdpAsn1 = JcaX509ExtensionUtils.parseExtensionValue(cdpExtension);
         CRLDistPoint distPoint = CRLDistPoint.getInstance(cdpAsn1);
 
+        X509Certificate issuerCert = getIssuerCertificate(certificate);
+        if (issuerCert == null) {
+            throw new SecurityException("Cannot verify CRL: issuer certificate not found");
+        }
+
         for (DistributionPoint dp : distPoint.getDistributionPoints()) {
             if (dp.getDistributionPoint() == null) continue;
             DistributionPointName dpName = dp.getDistributionPoint();
@@ -156,10 +155,28 @@ public class RevocationService {
                 if (gn.getTagNo() == GeneralName.uniformResourceIdentifier) {
                     String crlUrl = DERIA5String.getInstance(gn.getName()).getString();
                     try {
-                        X509CRL crl = downloadCRL(crlUrl);
-                        if (crl != null && crl.getRevokedCertificate(certificate.getSerialNumber()) != null) {
-                            return true;
+                        X509CRL crl;
+                        if (crlUrl.contains("localhost") || crlUrl.contains("127.0.0.1")) {
+                            String fileName = crlUrl.substring(crlUrl.lastIndexOf("/") + 1);
+                            Path path = Paths.get(crlDirectory, fileName);
+                            try (var in = Files.newInputStream(path)) {
+                                CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                                crl = (X509CRL) cf.generateCRL(in);
+                            }
+                        } else {
+                            crl = downloadCRL(crlUrl);
                         }
+
+                        if (crl != null) {
+                            validateCRL(crl, issuerCert);
+
+                            if (crl.getRevokedCertificate(certificate.getSerialNumber()) != null) {
+                                return true;
+                            }
+                        }
+                    } catch (SecurityException e) {
+                        log.error("CRL verification failed for URL {}: {}", crlUrl, e.getMessage());
+                        throw e;
                     } catch (Exception e) {
                         log.warn("Failed to check CRL {}: {}", crlUrl, e.getMessage());
                     }
@@ -236,6 +253,67 @@ public class RevocationService {
         return keyService.unwrapPrivateKey(wrappedPrivateKey, wrappedDek, wrappedKek);
     }
 
+    private void verifyCRLSignature(X509CRL crl, X509Certificate issuerCertificate) throws Exception {
+        try {
+            crl.verify(issuerCertificate.getPublicKey(), "BC");
+        } catch (Exception e) {
+            throw new SecurityException("Invalid CRL signature: " + e.getMessage(), e);
+        }
+    }
+
+    private void validateCRL(X509CRL crl, X509Certificate issuerCertificate) throws Exception {
+        // potpis
+        verifyCRLSignature(crl, issuerCertificate);
+
+        // da li je istekao
+        Date now = new Date();
+        if (crl.getThisUpdate().after(now)) {
+            throw new SecurityException("CRL is not yet valid (thisUpdate is in the future)");
+        }
+
+        if (crl.getNextUpdate() != null && crl.getNextUpdate().before(now)) {
+            throw new SecurityException("CRL has expired");
+        }
+
+        if (!crl.getIssuerX500Principal().equals(issuerCertificate.getSubjectX500Principal())) {
+            throw new SecurityException("CRL issuer does not match certificate issuer");
+        }
+
+        log.debug("CRL validation passed for issuer: {}",
+                issuerCertificate.getSerialNumber().toString(16));
+    }
+
+    private X509Certificate getIssuerCertificate(X509Certificate certificate) throws Exception {
+        String issuerDN = certificate.getIssuerX500Principal().getName();
+
+        List<Certificate> allCerts = certificateRepository.findAll();
+        for (Certificate cert : allCerts) {
+            try {
+                X509Certificate x509 = getX509Certificate(cert.getSerialNumber());
+                String subjectDN = x509.getSubjectX500Principal().getName();
+
+                if (normalizeDN(subjectDN).equals(normalizeDN(issuerDN))) {
+                    log.debug("Found issuer certificate: {} for DN: {}",
+                            cert.getSerialNumber(), issuerDN);
+                    return x509;
+                }
+            } catch (Exception e) {
+                log.warn("Failed to load certificate {}: {}",
+                        cert.getSerialNumber(), e.getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    private String normalizeDN(String dn) {
+        if (dn == null) return "";
+        return dn.replaceAll("\\s*,\\s*", ",")
+                .replaceAll("\\s*=\\s*", "=")
+                .toLowerCase()
+                .trim();
+    }
+
     public static class CRLCacheEntry {
         public byte[] crlData;
         public Date generatedAt;
@@ -247,33 +325,36 @@ public class RevocationService {
             this.nextUpdate = nextUpdate;
         }
     }
+
     public byte[] getOrGenerateCRL(String issuerSerialNumber) throws Exception {
-        // 1. Proveri keš
         CRLCacheEntry cached = crlCache.get(issuerSerialNumber);
         if (cached != null && cached.nextUpdate.after(new Date())) {
             log.debug("Returning cached CRL for issuer {}", issuerSerialNumber);
             return cached.crlData;
         }
 
-        // 2. Učitaj sa diska
         try {
             X509CRL crl = loadCRLFromFile(issuerSerialNumber);
             if (crl != null && crl.getNextUpdate().after(new Date())) {
+                // potpis
+                X509Certificate issuerCert = getX509Certificate(issuerSerialNumber);
+                validateCRL(crl, issuerCert);
+
                 byte[] crlBytes = crl.getEncoded();
                 crlCache.put(issuerSerialNumber, new CRLCacheEntry(
                         crlBytes,
                         crl.getThisUpdate(),
                         crl.getNextUpdate()
                 ));
-                log.debug("Loaded CRL from file for issuer {}", issuerSerialNumber);
                 return crlBytes;
             }
+        } catch (SecurityException e) {
+            log.error("CRL verification failed for issuer {}, regenerating CRL",
+                    issuerSerialNumber, e);
         } catch (Exception e) {
             log.warn("Failed to load CRL from file for issuer {}: {}",
                     issuerSerialNumber, e.getMessage());
         }
-
-        // 3. Generiši novi CRL
         return generateCRL(issuerSerialNumber);
     }
 
