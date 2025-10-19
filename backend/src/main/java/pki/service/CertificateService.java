@@ -118,20 +118,28 @@ public class CertificateService {
 
     @Transactional
     public void issueIntermediateCertificate(CreateIntermediateCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
-        issueNonRootCertificate(certificateDTO, true);
+        try {
+            issueNonRootCertificate(certificateDTO, true);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Transactional
     public DownloadCertificateDTO issueEndEntityCertificate(CreateEndEntityCertificateDTO certificateDTO) throws GeneralSecurityException, OperatorCreationException, IOException {
-        return issueNonRootCertificate(certificateDTO, false);
+        try {
+            return issueNonRootCertificate(certificateDTO, false);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Transactional
-    protected DownloadCertificateDTO issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws GeneralSecurityException, OperatorCreationException, IOException {
+    protected DownloadCertificateDTO issueNonRootCertificate(CreateNonRootCertificateDTO certificateDTO, boolean intermediate) throws Exception {
         CertificateParty issuer = certificatePartyRepository.findById(certificateDTO.getIssuerId())
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + certificateDTO.getIssuerId() + " not found"));
 
-        checkCertificateChainRevocation(issuer);
+        revocationService.checkCertificateChainRevocation(issuer);
 
         Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuer);
         if(issuerCertificate == null)
@@ -245,13 +253,13 @@ public class CertificateService {
     private void checkExtendedKeyUsage(Collection<ExtendedKeyUsageModel> parentUsages, Collection<ExtendedKeyUsageModel> childUsages){
         for(ExtendedKeyUsageModel usage : childUsages){
             if(!parentUsages.contains(usage))
-                throw new IllegalArgumentException("Given extended key usage is not allowed by issuer: ");
+                throw new IllegalArgumentException("Certificate issuance denied: one or more certificates in the chain are revoked");
         }
     }
 
 
     @Transactional
-    public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws IOException, GeneralSecurityException, OperatorCreationException {
+    public void processCSR(String csrContent, String issuerId, Date startDate, Date endDate) throws Exception {
         PemReader pemReader = new PemReader(new StringReader(csrContent));
         byte[] content = pemReader.readPemObject().getContent();
 
@@ -260,7 +268,7 @@ public class CertificateService {
         CertificateParty issuer = certificatePartyRepository.findById(issuerId)
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with ID " + issuerId + " not found"));
 
-        checkCertificateChainRevocation(issuer);
+        revocationService.checkCertificateChainRevocation(issuer);
 
         Certificate issuerCertificate = certificateRepository.findFirstBySubject(issuer);
         if(issuerCertificate == null)
@@ -497,41 +505,59 @@ public class CertificateService {
             );
         }
 
-        if(certificate.getSubject().getAlternativeName()!=null && !certificate.getSubject().getAlternativeName().isEmpty()){
+        if(certificate.getSubject().getAlternativeName()!=null &&
+                !certificate.getSubject().getAlternativeName().isEmpty()){
             GeneralName altName = new GeneralName(GeneralName.dNSName, certificate.getSubject().getAlternativeName());
             GeneralNames subjectAltName = new GeneralNames(altName);
             certGen.addExtension(Extension.subjectAlternativeName, false, subjectAltName);
         }
 
-        if(certificate.getIssuer().getAlternativeName()!=null && !certificate.getIssuer().getAlternativeName().isEmpty()){
+        if(certificate.getIssuer().getAlternativeName()!=null &&
+                !certificate.getIssuer().getAlternativeName().isEmpty()){
             GeneralName altName = new GeneralName(GeneralName.dNSName, certificate.getIssuer().getAlternativeName());
             GeneralNames issuerAltName = new GeneralNames(altName);
             certGen.addExtension(Extension.issuerAlternativeName, false, issuerAltName);
         }
 
 
-        String crlDpUrl;
-        if (certificate.getType() == CertificateType.ROOT) {
-            crlDpUrl = crlUrl + "/" + certificate.getSerialNumber();
-        } else {
+        // VAŽNO: ROOT certifikat NE TREBA CDP ekstenziju!
+        // Root je self-signed i ne može biti u tuđem CRL-u
+        if (certificate.getType() != CertificateType.ROOT) {
+            // Za INTERMEDIATE i END_ENTITY: CDP pokazuje na CRL ISSUERA
             Certificate issuerCert = certificateRepository.findFirstBySubject(certificate.getIssuer());
-            if (issuerCert == null) {
-                throw new IllegalArgumentException("Issuer certificate not found for CRL DP");
-            }
-            crlDpUrl = crlUrl + "/" + issuerCert.getSerialNumber();
-        }
 
-        DistributionPointName distPoint = new DistributionPointName(
-                new GeneralNames(new GeneralName(GeneralName.uniformResourceIdentifier, crlDpUrl))
-        );
-        DistributionPoint[] distPoints = new DistributionPoint[]{new DistributionPoint(distPoint, null, null)};
-        certGen.addExtension(Extension.cRLDistributionPoints, false, new CRLDistPoint(distPoints));
+            if (issuerCert == null) {
+                throw new IllegalArgumentException(
+                        "Issuer certificate not found for CRL DP: " + certificate.getSerialNumber()
+                );
+            }
+
+            // URL pokazuje na CRL fajl ISSUERA (ne trenutnog sertifikata)
+            String crlDpUrl = crlUrl + "/" + issuerCert.getSerialNumber() + ".crl";
+
+            DistributionPointName distPoint = new DistributionPointName(
+                    new GeneralNames(
+                            new GeneralName(GeneralName.uniformResourceIdentifier, crlDpUrl)
+                    )
+            );
+
+            DistributionPoint[] distPoints = new DistributionPoint[]{
+                    new DistributionPoint(distPoint, null, null)
+            };
+
+            certGen.addExtension(
+                    Extension.cRLDistributionPoints,
+                    false,
+                    new CRLDistPoint(distPoints)
+            );
+        }
 
         X509CertificateHolder certHolder = certGen.build(contentSigner);
         JcaX509CertificateConverter certConverter = new JcaX509CertificateConverter().setProvider("BC");
 
         return certConverter.getCertificate(certHolder);
     }
+
     public int mapKeyUsage(KeyUsageModel model){
         return switch (model) {
             case DIGITAL_SIGNATURE -> KeyUsage.digitalSignature;
@@ -589,31 +615,6 @@ public class CertificateService {
         }
 
         return checkCertificateChainValidity(issuerCertificate.getIssuer(), startDate, endDate);
-    }
-
-    private void checkCertificateChainRevocation(CertificateParty issuerParty) {
-        Certificate currentCertificate = certificateRepository.findFirstBySubject(issuerParty);
-
-        while (currentCertificate != null) {
-            boolean isRevoked = revokedCertificateRepository.existsBySerialNumber(
-                    currentCertificate.getSerialNumber()
-            );
-
-            if (isRevoked) {
-                throw new IllegalArgumentException(
-                        "Certificate with serial number " + currentCertificate.getSerialNumber() +
-                                " (CN=" + currentCertificate.getSubject().getCommonName() + ") in the chain is revoked"
-                );
-            }
-
-            if (currentCertificate.getType() == CertificateType.ROOT) {
-                break;
-            }
-
-            currentCertificate = certificateRepository.findFirstBySubject(
-                    currentCertificate.getIssuer()
-            );
-        }
     }
 
     private void checkCaPermissions(CertificateParty issuer){
@@ -687,37 +688,6 @@ public class CertificateService {
                 .toList();
     }
 
-    @Transactional
-    public void revokeCertificate(String serialNumber, RevocationReason reason) {
-        Certificate certificate = certificateRepository.findFirstBySerialNumber(serialNumber);
-        if (certificate == null) throw new IllegalArgumentException("Certificate not found");
-
-        RevokedCertificate revokedCertificate = new RevokedCertificate();
-        revokedCertificate.setSerialNumber(serialNumber);
-        revokedCertificate.setRevokedAt(new Date());
-        revokedCertificate.setReasonCode(reason);
-        revokedCertificate.setIssuerId(certificate.getIssuer().getId());
-
-        revokedCertificateRepository.save(revokedCertificate);
-
-        try {
-            Certificate issuer = certificateRepository.findFirstBySubject(certificate.getIssuer());
-            if (issuer == null) throw new IllegalArgumentException("Issuer certificate not found");
-
-            PrivateKey issuerPrivateKey = getIssuerPrivateKey(issuer);
-            PublicKey issuerPublicKey = issuer.getPublicKey();
-            X500Name issuerName = issuer.getSubject().getX500Name();
-
-            revocationService.generateCRL(
-                    issuerPrivateKey,
-                    issuerName,
-                    certificate.getIssuer().getId(),
-                    issuerPublicKey
-            );
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to update CRL, rolling back revocation", e);
-        }
-    }
 
     public Certificate getRootCertificate() {
         return certificateRepository.findFirstByType(CertificateType.ROOT);
