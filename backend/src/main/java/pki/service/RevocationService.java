@@ -227,7 +227,14 @@ public class RevocationService {
         List<RevokedCertificate> revokedCerts = revokedCertificateRepository.findByIssuerId(issuerCert.getSubject().getId());
         for (RevokedCertificate revoked : revokedCerts) {
             BigInteger serial = new BigInteger(revoked.getSerialNumber(), 16);
-            crlBuilder.addCRLEntry(serial, revoked.getRevokedAt(), null);
+
+            CRLReason crlReason = CRLReason.lookup(revoked.getReasonCode().ordinal());
+
+            ExtensionsGenerator extGen = new ExtensionsGenerator();
+            extGen.addExtension(Extension.reasonCode, false, crlReason);
+            Extensions extensions = extGen.generate();
+
+            crlBuilder.addCRLEntry(serial, revoked.getRevokedAt(), extensions);
         }
 
         ContentSigner signer = new JcaContentSignerBuilder("SHA256WithRSA").setProvider("BC").build(issuerPrivateKey);
