@@ -635,6 +635,7 @@ public class CertificateService {
         List<Certificate> certificates = new ArrayList<>();
         if(Objects.equals(userService.getPrimaryRole(), "ca")) {
             for(Certificate ownedCertificate:userService.getLoggedUser().getOwnedCertificates()){
+                certificates.add(ownedCertificate);
                 certificates.addAll(getAllChildCertificates(ownedCertificate));
             }
             certificates.removeIf(c -> c.getType() == CertificateType.END_ENTITY);
