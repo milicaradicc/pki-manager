@@ -13,6 +13,7 @@ import pki.model.RevocationReason;
 import pki.model.User;
 import pki.service.CertificateService;
 import pki.service.ExportService;
+import pki.service.RevocationService;
 
 import java.io.IOException;
 import java.security.*;
@@ -21,13 +22,17 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
 
+@Slf4j
 @RestController
 @RequestMapping("/certificates")
 @RequiredArgsConstructor
 public class CertificateController {
     private final CertificateService certificateService;
     private final ExportService exportService;
+    private  final RevocationService revocationService;
 
     @PreAuthorize("hasAuthority('ROLE_admin')")
     @PostMapping("/root")
@@ -61,7 +66,11 @@ public class CertificateController {
         Date start = new SimpleDateFormat("yyyy-MM-dd").parse(startDate);
         Date end = new SimpleDateFormat("yyyy-MM-dd").parse(endDate);
         String csrContent = new String(csrFile.getBytes());
-        certificateService.processCSR(csrContent, issuerId, start, end);
+        try {
+            certificateService.processCSR(csrContent, issuerId, start, end);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         return ResponseEntity.ok(null);
     }
 
@@ -85,12 +94,21 @@ public class CertificateController {
         return ResponseEntity.ok(certificates);
     }
 
-    @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
     @PostMapping("/{serial}/revoke")
-    public ResponseEntity<Void> revokeCertificate(@PathVariable String serial, @RequestBody RevokeReasonDTO dto) {
-        RevocationReason reason = RevocationReason.valueOf(dto.getREASON().toUpperCase());
-        certificateService.revokeCertificate(serial, reason);
-        return ResponseEntity.ok().build();
+    @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")
+    public ResponseEntity<String> revokeCertificate(@Valid @RequestBody RevokeCertificateDTO dto) {
+        try {
+            System.out.println("Received DTO: " + dto);
+            RevocationReason reason = RevocationReason.valueOf(dto.getReason().toUpperCase());
+            revocationService.revokeCertificate(dto.getSerialNumber(), reason);
+            return ResponseEntity.ok("Certificate revoked successfully");
+        } catch (IllegalArgumentException e) {
+            log.error("Error revoking certificate: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            log.error("Unexpected error revoking certificate", e);
+            return ResponseEntity.internalServerError().body("Failed to revoke certificate");
+        }
     }
 
     @PreAuthorize("hasAuthority('ROLE_user') or hasAuthority('ROLE_admin') or hasAuthority('ROLE_ca')")

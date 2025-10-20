@@ -45,7 +45,7 @@ public class BasicSecurityConfig {
         http.oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtRoleConverter)));
 
         http.authorizeHttpRequests((requests) -> requests
-                .requestMatchers(HttpMethod.GET, "/user/home").permitAll()
+                .requestMatchers("/crl/**").permitAll()
                 .anyRequest().authenticated()
         );
 
