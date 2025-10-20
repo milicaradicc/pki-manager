@@ -8,6 +8,7 @@ import { environment } from '../../../environments/environment';
 import { AssignCertificateDTO } from './models/assign-certificate.model';
 import { DownloadCertificateDTO } from './models/download-certificate.model';
 import { CreateEndEntityCertificateDTO } from './models/create-end-entity-dto.model';
+import { RevokeCertificateDTO } from './models/revoke-certificate-dto.model';
 
 @Injectable({
   providedIn: 'root'
@@ -49,9 +50,10 @@ export class CertificateService {
     return this.http.post<void>(`${this.baseUrl}/assign-ca-user`, dto);
   }
 
-  revokeCertificate(serial: string, reason: string): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/${serial}/revoke`, { reason });
+  revokeCertificate(dto: RevokeCertificateDTO): Observable<string> {
+    return this.http.post(`${this.baseUrl}/${dto.serialNumber}/revoke`,dto,{ responseType: 'text' } );
   }
+
 
   downloadCertificate(serialNumber:string): Observable<DownloadCertificateDTO> {
     return this.http.get<DownloadCertificateDTO>(`${this.baseUrl}/${serialNumber}/download`);

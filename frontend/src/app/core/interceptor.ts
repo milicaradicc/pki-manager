@@ -14,6 +14,13 @@ export class Interceptor implements HttpInterceptor {
       return next.handle(req);
     }
 
+    // updateToken() metoda u Keycloak adapteru 
+    // automatski koristi refresh token da osveži 
+    // access token kada mu uskoro ističe rok, 
+    // tako da nije potrebno ručno slanje refresh tokena. 
+    // Ako je i refresh token istekao, updateToken() baca 
+    // grešku koju treba uhvatiti u interceptoru i 
+    // tada odjaviti korisnika.
     return from(this.keycloak['keycloak']!.updateToken(30)).pipe(
       switchMap(() => {
         const token = this.keycloak.getToken();
@@ -26,7 +33,7 @@ export class Interceptor implements HttpInterceptor {
           return next.handle(cloned);
         }
         return next.handle(req);
-      })
+      }),
     );
   }
 }

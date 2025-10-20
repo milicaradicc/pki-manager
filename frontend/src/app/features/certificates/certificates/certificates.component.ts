@@ -10,6 +10,7 @@ import { saveAs } from 'file-saver';
 import {MatButtonModule} from '@angular/material/button';
 import { MatIcon } from "@angular/material/icon";
 import { ExtendedKeyUsageType } from '../models/ExtendedKeyUsage';
+import { RevokeCertificateDTO } from '../models/revoke-certificate-dto.model';
 
 interface CertificateNode {
   certificate: GetCertificateDto;
@@ -208,22 +209,29 @@ export class CertificatesComponent implements OnInit {
     if (this.selectedReason && this.revokingCertificateSerial) {
       this.loading = true;
       this.clearMessages();
-      this.certificateService
-        .revokeCertificate(this.revokingCertificateSerial, this.selectedReason)
-        .subscribe({
-          next: () => {
-            this.success = 'Certificate revoked successfully';
-            this.loading = false;
-            this.showRevocationPopup = false;
-            this.revokingCertificateSerial = null;
-            this.selectedReason = null;
-            this.loadCertificates();
-          },
-          error: () => {
-            this.error = 'Failed to revoke certificate';
-            this.loading = false;
-          }
-        });
+
+      const dto: RevokeCertificateDTO = {
+        serialNumber: this.revokingCertificateSerial,
+        reason: this.selectedReason
+      };
+
+      console.log(dto)
+      this.certificateService.revokeCertificate(dto).subscribe({
+        next: (result) => {
+          console.log(result)
+          this.success = 'Certificate revoked successfully';
+          this.loading = false;
+          this.showRevocationPopup = false;
+          this.revokingCertificateSerial = null;
+          this.selectedReason = null;
+          this.loadCertificates();
+        },
+        error: (error) => {
+          this.error = 'Failed to revoke certificate';
+          this.loading = false;
+          console.log(error)
+        }
+      });
     }
   }
 

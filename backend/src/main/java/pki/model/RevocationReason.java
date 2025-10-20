@@ -1,5 +1,7 @@
 package pki.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import org.bouncycastle.asn1.x509.CRLReason;
 
 public enum RevocationReason {
@@ -26,5 +28,15 @@ public enum RevocationReason {
 
     public CRLReason toBouncyCastleCRLReason() {
         return CRLReason.lookup(code);
+    }
+
+    @JsonCreator
+    public static RevocationReason fromString(String value) {
+        return RevocationReason.valueOf(value.toUpperCase());
+    }
+
+    @JsonValue
+    public String toValue() {
+        return this.name();
     }
 }
